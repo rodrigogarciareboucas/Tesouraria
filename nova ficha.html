@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ficha Financeira Anual - Loja Jerônimo Rosado 1994</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&family=Lato:wght@400;700&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        /* CONFIGURAÇÕES GLOBAIS DE APRESENTAÇÃO */
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 20px 0; background-color: #0f172a; display: grid; gap: 40px; place-items: center; }
+
+        .slide-container {
+            width: 1280px; height: 720px;
+            background-color: #fff;
+            padding: 40px 50px;
+            display: flex; flex-direction: column;
+            position: relative; overflow: hidden;
+            font-family: 'Lato', sans-serif;
+            border-radius: 4px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+
+        /* DESIGN INSTITUCIONAL (AZUL E OURO) */
+        .slide-container.dark-theme { background: #002147; color: #fdf5e6; }
+        .slide-container.dark-theme::before {
+            content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, rgba(0,0,0,0.2) 0%, transparent 100%);
+            z-index: 0;
+        }
+
+        /* INTERATIVIDADE CLIQUE E EDITE */
+        [contenteditable="true"] { outline: none; transition: background 0.2s; border-radius: 4px; }
+        [contenteditable="true"]:hover { background: rgba(212, 175, 55, 0.15); cursor: text; }
+        [contenteditable="true"]:focus { background: rgba(212, 175, 55, 0.1); box-shadow: 0 0 0 2px #d4af37; }
+
+        h1, h2, h3 { font-family: 'Merriweather', serif; margin: 0; z-index: 1; }
+        .slide-title { font-size: 32px; font-weight: 700; color: #002147; margin-bottom: 20px; border-bottom: 3px solid #d4af37; padding-bottom: 8px; width: 100%; text-align: left; }
+        
+        .content-area { flex-grow: 1; display: flex; flex-direction: column; justify-content: flex-start; width: 100%; z-index: 1; }
+
+        /* BOX UNIFICADO DE IDENTIFICAÇÃO */
+        .profile-summary-box {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8fafc;
+            padding: 15px 25px;
+            border-radius: 6px;
+            border-left: 8px solid #002147;
+            margin-bottom: 20px;
+            border-top: 1px solid #e2e8f0;
+            border-right: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .profile-item { display: flex; flex-direction: column; }
+        .profile-label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+        .profile-value { font-size: 20px; font-weight: 700; color: #002147; margin: 0; }
+
+        /* LOGO BOX */
+        .logo-box {
+            width: 160px; height: 160px;
+            margin-bottom: 25px;
+            object-fit: contain;
+            z-index: 2;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .logo-box:hover { transform: scale(1.02); }
+
+        /* TABELA AMPLIADA PARA 12 MESES */
+        .table-wrapper { width: 100%; overflow: hidden; border-radius: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); border: 1px solid #cbd5e1; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; background: white; }
+        th { background: #002147; color: #d4af37; padding: 10px 4px; border: 1px solid #003366; font-family: 'Poppins'; text-transform: uppercase; font-size: 11px; text-align: center; }
+        td { border: 1px solid #e2e8f0; padding: 10px 4px; text-align: center; color: #1e293b; }
+        td:first-child { text-align: left; font-weight: 700; background: #f8fafc; padding-left: 12px; width: 210px; }
+        .total-row td { background: #fffbeb; font-weight: 700; color: #92400e; border-top: 2px solid #d4af37; }
+
+        /* INTERFACE */
+        .print-btn {
+            position: fixed; top: 20px; right: 20px; padding: 12px 28px;
+            background: #d4af37; color: #002147; border: none; border-radius: 50px;
+            font-family: 'Poppins'; font-weight: 700; cursor: pointer; z-index: 100;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3); transition: 0.3s;
+        }
+        .print-btn:hover { transform: scale(1.05); }
+
+        @media print { .print-btn { display: none; } body { padding: 0; background: white; } .slide-container { box-shadow: none; border: none; page-break-after: always; } }
+    </style>
+</head>
+<body>
+
+    <button class="print-btn" onclick="window.print()"><i class="fa-solid fa-file-pdf"></i> GERAR PDF / IMPRIMIR</button>
+
+    <div class="slide-container dark-theme" style="justify-content: center; align-items: center; text-align: center;">
+        <input type="file" id="logoInput" style="display: none;" accept="image/*" onchange="loadLogo(event)">
+        <img src="blob:https://gemini.google.com/c5d7bccb-700c-4776-8ef4-9a74b01f0722" id="mainLogo" alt="Logo Jerônimo Rosado 1994" class="logo-box" onclick="document.getElementById('logoInput').click();" title="Clique para alterar a imagem se necessário">
+        
+        <h1 contenteditable="true" style="font-size: 42px; letter-spacing: 2px;">AUGUSTA RESPEITÁVEL E BENFEITORA LOJA</h1>
+        <h2 contenteditable="true" style="font-size: 52px; color: #d4af37; margin: 10px 0 25px;">JERÔNIMO ROSADO - Nº 1994</h2>
+        <div style="width: 120px; height: 4px; background: #d4af37; margin: 0 auto 25px;"></div>
+        <p contenteditable="true" style="font-size: 26px; font-family: 'Poppins'; letter-spacing: 3px;">FICHA FINANCEIRA ANUAL COMPLETA - 2026</p>
+        <p style="margin-top: 40px; opacity: 0.6; font-size: 14px;">Oriente de Mossoró - RN | GOB-RN</p>
+    </div>
+
+    <div class="slide-container" style="padding: 35px 45px;">
+        <h2 class="slide-title">FLUXO FINANCEIRO INTEGRAL - EXERCÍCIO 2026</h2>
+        
+        <div class="content-area">
+            <div class="profile-summary-box">
+                <div class="profile-item" style="flex-grow: 2;">
+                    <span class="profile-label">Nome do Obreiro</span>
+                    <h3 contenteditable="true" class="profile-value" style="font-size: 22px;">Agenilton Gonçalves de Lima</h3>
+                </div>
+                <div class="profile-item" style="flex-grow: 1; padding-left: 20px;">
+                    <span class="profile-label">CIM</span>
+                    <p contenteditable="true" class="profile-value">336627</p>
+                </div>
+                <div class="profile-item" style="flex-grow: 1; padding-left: 20px;">
+                    <span class="profile-label">Situação</span>
+                    <p contenteditable="true" class="profile-value" style="color: #16a34a;">REGULAR</p>
+                </div>
+            </div>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Obrigações (R$)</th>
+                            <th>Jan</th><th>Fev</th><th>Mar</th><th>Abr</th><th>Mai</th><th>Jun</th>
+                            <th>Jul</th><th>Ago</th><th>Set</th><th>Out</th><th>Nov</th><th>Dez</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Mensalidade Loja</td>
+                            <td contenteditable="true">162,00</td><td contenteditable="true">162,00</td><td contenteditable="true">162,00</td><td contenteditable="true">162,00</td>
+                            <td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td>
+                            <td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td>
+                            <td contenteditable="true" style="font-weight:700;">648,00</td>
+                        </tr>
+                        <tr>
+                            <td>Fraternidade Feminina</td>
+                            <td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td>
+                            <td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td>
+                            <td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td>
+                            <td contenteditable="true" style="font-weight:700;">-</td>
+                        </tr>
+                        <tr>
+                            <td>Auxílio Funeral (PAF)</td>
+                            <td contenteditable="true">10,84</td><td contenteditable="true">10,84</td><td contenteditable="true">10,84</td><td contenteditable="true">10,84</td>
+                            <td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td>
+                            <td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td>
+                            <td contenteditable="true" style="font-weight:700;">43,36</td>
+                        </tr>
+                        <tr>
+                            <td>Anuidade GOB Federal</td>
+                            <td contenteditable="true">17,50</td><td contenteditable="true">17,50</td><td contenteditable="true">17,50</td><td contenteditable="true">17,50</td>
+                            <td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td>
+                            <td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td>
+                            <td contenteditable="true" style="font-weight:700;">70,00</td>
+                        </tr>
+                        <tr>
+                            <td>Anuidade GOB RN</td>
+                            <td contenteditable="true">28,17</td><td contenteditable="true">28,17</td><td contenteditable="true">28,17</td><td contenteditable="true">28,17</td>
+                            <td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td>
+                            <td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td>
+                            <td contenteditable="true" style="font-weight:700;">112,68</td>
+                        </tr>
+                        <tr>
+                            <td contenteditable="true">Outra taxa</td>
+                            <td contenteditable="true">162,00</td><td contenteditable="true">162,00</td><td contenteditable="true">162,00</td><td contenteditable="true">162,00</td>
+                            <td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td>
+                            <td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">-</td>
+                            <td contenteditable="true" style="font-weight:700;">648,00</td>
+                        </tr>
+                        <tr class="total-row">
+                            <td>TOTAL GERAL</td>
+                            <td contenteditable="true">218,51</td><td contenteditable="true">218,51</td><td contenteditable="true">218,51</td><td contenteditable="true">218,51</td>
+                            <td contenteditable="true">0,00</td><td contenteditable="true">0,00</td><td contenteditable="true">0,00</td><td contenteditable="true">0,00</td>
+                            <td contenteditable="true">0,00</td><td contenteditable="true">0,00</td><td contenteditable="true">0,00</td><td contenteditable="true">0,00</td>
+                            <td contenteditable="true">874,04</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="margin-top: 15px; background: #fffbeb; padding: 12px 20px; border-radius: 6px; border: 1px dashed #d4af37;">
+                <p contenteditable="true" style="font-size: 13px; margin: 0; color: #92400e; text-align: center;">
+                    <strong>GOB Federal: 210,00 (3x 70,00 Mar-Mai) | GOB RN: 325,00 (3x 108,33 Jun-Ago) | PAF: 125,00 (2x 62,50 Set-Out)</strong> 
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-container dark-theme" style="text-align: center; justify-content: center;">
+        <h1 contenteditable="true" style="color: #d4af37; font-size: 65px; margin-bottom: 15px;">T∴F∴A∴</h1>
+        <div style="width: 80px; height: 3px; background: #d4af37; margin: 20px auto;"></div>
+        <p contenteditable="true" style="font-size: 24px; font-family: 'Poppins';">TESOURARIA - LOJA JERÔNIMO ROSADO 1994</p>
+        <p contenteditable="true" style="font-size: 15px; opacity: 0.7; margin-top: 50px;">
+            Gestão Financeira Transparente | "Pela União de Nossos Corações"
+        </p>
+    </div>
+
+    <script>
+        function loadLogo(event) {
+            var output = document.getElementById('mainLogo');
+            output.src = URL.createObjectURL(event.target.files[0]);
+            output.onload = function() {
+                URL.revokeObjectURL(output.src)
+            }
+        };
+    </script>
+</body>
+</html>

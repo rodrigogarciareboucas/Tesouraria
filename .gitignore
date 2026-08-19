@@ -1,0 +1,74 @@
+# Ambiente virtual
+venv/
+env/
+ENV/
+.venv
+
+# Banco de dados
+*.db
+*.sqlite
+*.sqlite3
+
+# Arquivos de ambiente
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Arquivos temporários
+*.log
+*.tmp
+*.temp
+*.bak
+*.old
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Arquivos de backup
+BKP/
+dist/
+
+# Arquivos de dados sensíveis
+dados_obreiros_extraidos.txt
+transacoes_extraidas.txt
+
+# Extratos e documentos PDF
+*.pdf
+extrato sicredi/
+
+# Pastas temporárias
+contas a pagar/
+contas a receber/
+Fichas dos Obreiros/
+Taxas/
+mysql_data/
+instalador/

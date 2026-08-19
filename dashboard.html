@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Financeiro Detalhado - Jerônimo Rosado 1994</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        /* CONFIGURAÇÕES GLOBAIS */
+        * { box-sizing: border-box; }
+        body {
+            background-color: #0f172a;
+            display: grid; gap: 40px;
+            grid-template-columns: 1fr;
+            margin: 0; min-height: 100vh;
+            padding: 40px 0; place-items: center;
+        }
+
+        /* ESTRUTURA DOS SLIDES */
+        .slide-container {
+            width: 1280px; height: 720px;
+            background-color: #ffffff;
+            padding: 50px 60px;
+            display: flex; flex-direction: column;
+            position: relative; overflow: hidden;
+            font-family: 'Lato', sans-serif;
+            border-radius: 4px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+        .slide-container::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; background-color: #fff; }
+        .dark-slide.slide-container::before { background: linear-gradient(135deg, #001f3f 0%, #001122 100%); }
+        .slide-container > * { position: relative; z-index: 1; }
+
+        /* TIPOGRAFIA */
+        h1, h2, h3 { color: #001f3f; font-weight: 700; font-family: 'Poppins', sans-serif; margin: 0; }
+        .dark-slide h1, .dark-slide h2, .dark-slide h3 { color: #fdf5e6 !important; }
+        .slide-title { font-size: 32px; font-weight: 700; color: #001f3f; margin-bottom: 25px; border-bottom: 3px solid #d4af37; padding-bottom: 8px; width: 100%; text-align: left; }
+        .dark-slide .slide-title { color: #d4af37 !important; border-bottom-color: #fdf5e6; }
+        
+        /* EDIÇÃO CLIQUE E DIGITE */
+        [contenteditable="true"] { outline: none; border-radius: 4px; transition: background 0.2s; }
+        [contenteditable="true"]:hover { background: rgba(212, 175, 55, 0.1); cursor: text; }
+
+        /* TABELAS DETALHADAS */
+        .table-wrapper { width: 100%; flex-grow: 1; overflow: hidden; border-radius: 8px; border: 1px solid #e2e8f0; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; background: white; }
+        th { background-color: #001f3f; color: #d4af37; padding: 10px; text-align: left; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; }
+        td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+        tr:nth-child(even) { background-color: #f8fafc; }
+        
+        /* CATEGORIA COLORS */
+        .cat-gob { color: #1e40af; font-weight: 700; }
+        .cat-util { color: #b45309; font-weight: 700; }
+        .cat-tax { color: #15803d; font-weight: 700; }
+
+        /* KPI CARDS */
+        .kpi-row { display: flex; gap: 20px; margin-bottom: 30px; }
+        .kpi-card { background: #f8fafc; padding: 20px; border-radius: 8px; flex: 1; border-top: 4px solid #d4af37; text-align: center; }
+        .kpi-value { font-size: 32px; font-weight: 700; color: #001f3f; display: block; }
+        .kpi-label { font-size: 12px; text-transform: uppercase; color: #64748b; font-weight: 700; }
+
+        .masonic-watermark { position: absolute; bottom: 30px; right: 30px; opacity: 0.03; font-size: 120px; color: #001f3f; pointer-events: none; }
+        .print-btn { position: fixed; top: 20px; right: 20px; padding: 12px 25px; background: #d4af37; color: #001f3f; border: none; border-radius: 50px; font-weight: 700; cursor: pointer; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        
+        @media print { .print-btn { display: none; } body { padding: 0; background: white; } .slide-container { box-shadow: none; border: none; page-break-after: always; } }
+    </style>
+</head>
+<body>
+
+    <button class="print-btn" onclick="window.print()"><i class="fa-solid fa-file-pdf"></i> EXPORTAR RELATÓRIO PDF</button>
+
+    <div class="slide-container dark-slide">
+        <div style="text-align: center; margin: auto;">
+            <img src="Logo.jpg" alt="Logo" style="width: 160px; height: 160px; border-radius: 50%; border: 4px solid #d4af37; margin-bottom: 25px;">
+            <h1 contenteditable="true" style="font-size: 48px; line-height: 1.2;">Relatório de Prestação de Contas<br><span style="color:#d4af37;">Jerônimo Rosado 1994</span></h1>
+            <p contenteditable="true" style="font-size: 24px; margin-top: 20px; letter-spacing: 3px; font-weight: bold;">DETALHAMENTO DE SAÍDAS • JAN A MAI 2026</p>
+            <div style="width: 80px; height: 4px; background: #d4af37; margin: 30px auto;"></div>
+            <p style="opacity: 0.7; font-style: italic;">"Pela União de Nossos Corações" • Mossoró - RN</p>
+        </div>
+    </div>
+
+    <div class="slide-container">
+        <h2 class="slide-title">Visão Geral do Período</h2>
+        <div class="kpi-row">
+            <div class="kpi-card"><span class="kpi-label">Saldo Inicial</span><span class="kpi-value" contenteditable="true">R$ 2.363,59</span></div>
+            <div class="kpi-card"><span class="kpi-label">Total Saídas (5 Meses)</span><span class="kpi-value" style="color:#ef4444;" contenteditable="true">R$ 36.016,31</span></div>
+            <div class="kpi-card"><span class="kpi-label">Saldo Atual (20/Mai)</span><span class="kpi-value" style="color:#16a34a;" contenteditable="true">R$ 4.966,16</span></div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+            <div style="background: #001f3f; color: white; padding: 30px; border-radius: 8px;">
+                <h3 style="color:#d4af37; margin-bottom: 15px;">Análise da Tesouraria</h3>
+                <p contenteditable="true" style="color:#fdf5e6; font-size: 16px; line-height: 1.6;">O período foi marcado por uma forte concentração de pagamentos institucionais (GOB) e custos fixos de manutenção (Cosern/Neoenergia). No entanto, o fluxo de recebimentos de maio permitiu uma recuperação de 179% no saldo de caixa em comparação ao fechamento de abril.</p>
+            </div>
+            <div style="border: 1px solid #e2e8f0; padding: 30px; border-radius: 8px;">
+                <h3 style="margin-bottom: 15px;">Maiores Credores</h3>
+                <ul style="list-style: none; padding: 0; font-size: 16px;">
+                    <li style="margin-bottom: 10px;">🛡️ <strong>GOB (Federal/RN):</strong> R$ 14.673,99</li>
+                    <li style="margin-bottom: 10px;">⚡ <strong>Neoenergia Cosern:</strong> R$ 11.545,80</li>
+                    <li style="margin-bottom: 10px;">🏛️ <strong>Pref. de Mossoró:</strong> R$ 5.041,49</li>
+                    <li>🛠️ <strong>Manutenção/Internet:</strong> R$ 4.504,53</li>
+                </ul>
+            </div>
+        </div>
+        <div class="masonic-watermark"><i class="fa-solid fa-compass"></i></div>
+    </div>
+
+    <div class="slide-container">
+        <h2 class="slide-title">Livro Caixa: Janeiro e Fevereiro</h2>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Descrição do Lançamento / Favorecido</th>
+                        <th>Categoria</th>
+                        <th>Valor (R$)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>02/Jan</td><td>TCM TV Cabo Mossoró (Internet/TV)</td><td class="cat-util">Operacional</td><td contenteditable="true">134,80</td></tr>
+                    <tr><td>02/Jan</td><td>Uniconstru (Materiais/Manutenção)</td><td class="cat-util">Operacional</td><td contenteditable="true">700,10</td></tr>
+                    <tr><td>05/Jan</td><td>Tarifa de Conta (Cesta de Serviços)</td><td>Bancário</td><td contenteditable="true">49,00</td></tr>
+                    <tr><td>07/Jan</td><td>Neoenergia Cosern (Fatura Templo)</td><td class="cat-util">Energia</td><td contenteditable="true">2.205,01</td></tr>
+                    <tr><td>09/Jan</td><td>Prefeitura de Mossoró (Taxas)</td><td class="cat-tax">Tributos</td><td contenteditable="true">964,33</td></tr>
+                    <tr><td>14/Jan</td><td>Grande Oriente do Brasil (Capitação)</td><td class="cat-gob">Institucional</td><td contenteditable="true">3.750,00</td></tr>
+                    <tr><td>19/Jan</td><td>T E T Empreendimentos</td><td class="cat-util">Operacional</td><td contenteditable="true">236,65</td></tr>
+                    <tr><td>02/Fev</td><td>TCM TV Cabo Mossoró</td><td class="cat-util">Operacional</td><td contenteditable="true">137,61</td></tr>
+                    <tr><td>03/Fev</td><td>Neoenergia Cosern (Fatura Templo)</td><td class="cat-util">Energia</td><td contenteditable="true">1.626,23</td></tr>
+                    <tr><td>03/Fev</td><td>Tarifa de Conta Mensal</td><td>Bancário</td><td contenteditable="true">49,00</td></tr>
+                    <tr><td>05/Fev</td><td>Neoenergia Cosern</td><td class="cat-util">Energia</td><td contenteditable="true">532,30</td></tr>
+                    <tr><td>10/Fev</td><td>Grande Oriente do Brasil (GOB)</td><td class="cat-gob">Institucional</td><td contenteditable="true">410,00</td></tr>
+                    <tr><td>10/Fev</td><td>Prefeitura de Mossoró (Taxas)</td><td class="cat-tax">Tributos</td><td contenteditable="true">993,26</td></tr>
+                    <tr><td>11/Fev</td><td>Grande Oriente do Brasil (GOB)</td><td class="cat-gob">Institucional</td><td contenteditable="true">3.750,00</td></tr>
+                    <tr><td>18/Fev</td><td>Uniconstru (Manutenção)</td><td class="cat-util">Operacional</td><td contenteditable="true">1.425,00</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="slide-container">
+        <h2 class="slide-title">Livro Caixa: Março</h2>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Descrição do Lançamento / Favorecido</th>
+                        <th>Categoria</th>
+                        <th>Valor (R$)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>02/Mar</td><td>Neoenergia Cosern (Energia)</td><td class="cat-util">Energia</td><td contenteditable="true">471,96</td></tr>
+                    <tr><td>02/Mar</td><td>TCM TV Cabo Mossoró (Internet)</td><td class="cat-util">Operacional</td><td contenteditable="true">134,80</td></tr>
+                    <tr><td>03/Mar</td><td>Tarifa de Conta Mensal</td><td>Bancário</td><td contenteditable="true">49,00</td></tr>
+                    <tr><td>04/Mar</td><td>Neoenergia Cosern (Energia)</td><td class="cat-util">Energia</td><td contenteditable="true">1.655,83</td></tr>
+                    <tr><td>09/Mar</td><td>Grande Oriente do Brasil (Repasse)</td><td class="cat-gob">Institucional</td><td contenteditable="true">450,00</td></tr>
+                    <tr><td>09/Mar</td><td>Prefeitura de Mossoró (Tributos)</td><td class="cat-tax">Tributos</td><td contenteditable="true">964,33</td></tr>
+                    <tr><td>10/Mar</td><td>Grande Oriente do Brasil (Capitação)</td><td class="cat-gob">Institucional</td><td contenteditable="true">1.691,33</td></tr>
+                    <tr><td>10/Mar</td><td>Grande Oriente do Brasil (Taxas)</td><td class="cat-gob">Institucional</td><td contenteditable="true">450,00</td></tr>
+                    <tr><td>10/Mar</td><td>Grande Oriente do Brasil (Capitação)</td><td class="cat-gob">Institucional</td><td contenteditable="true">1.691,33</td></tr>
+                    <tr><td>11/Mar</td><td>Grande Oriente do Brasil (GOB)</td><td class="cat-gob">Institucional</td><td contenteditable="true">375,00</td></tr>
+                    <tr><td>13/Mar</td><td>Prefeitura de Mossoró (Taxas)</td><td class="cat-tax">Tributos</td><td contenteditable="true">405,86</td></tr>
+                    <tr><td>19/Mar</td><td>Neoenergia Cosern (Energia)</td><td class="cat-util">Energia</td><td contenteditable="true">157,49</td></tr>
+                    <tr><td>19/Mar</td><td>T E T Empreendimentos (Serviços)</td><td class="cat-util">Operacional</td><td contenteditable="true">603,00</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="slide-container">
+        <h2 class="slide-title">Livro Caixa: Abril e Maio</h2>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Descrição do Lançamento / Favorecido</th>
+                        <th>Categoria</th>
+                        <th>Valor (R$)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>01/Abr</td><td>Tarifa de Conta Mensal</td><td>Bancário</td><td contenteditable="true">49,00</td></tr>
+                    <tr><td>02/Abr</td><td>Neoenergia Cosern (Energia)</td><td class="cat-util">Energia</td><td contenteditable="true">495,57</td></tr>
+                    <tr><td>02/Abr</td><td>TCM TV Cabo Mossoró (Internet)</td><td class="cat-util">Operacional</td><td contenteditable="true">149,97</td></tr>
+                    <tr><td>09/Abr</td><td>Prefeitura de Mossoró (Tributos)</td><td class="cat-tax">Tributos</td><td contenteditable="true">339,22</td></tr>
+                    <tr><td>13/Abr</td><td>Grande Oriente do Brasil (Capitação)</td><td class="cat-gob">Institucional</td><td contenteditable="true">1.691,33</td></tr>
+                    <tr><td>13/Abr</td><td>Grande Oriente do Brasil (GOB)</td><td class="cat-gob">Institucional</td><td contenteditable="true">420,00</td></tr>
+                    <tr><td>14/Abr</td><td>T E T Empreendimentos (Manutenção)</td><td class="cat-util">Operacional</td><td contenteditable="true">537,60</td></tr>
+                    <tr><td>24/Abr</td><td>Prefeitura de Mossoró (Taxas)</td><td class="cat-tax">Tributos</td><td contenteditable="true">405,86</td></tr>
+                    <tr><td>29/Abr</td><td>Neoenergia Cosern (Fatura Templo)</td><td class="cat-util">Energia</td><td contenteditable="true">584,91</td></tr>
+                    <tr><td>30/Abr</td><td>Neoenergia Cosern (Energia)</td><td class="cat-util">Energia</td><td contenteditable="true">1.399,40</td></tr>
+                    <tr><td>30/Abr</td><td>Prefeitura de Mossoró (Tributos)</td><td class="cat-tax">Tributos</td><td contenteditable="true">964,33</td></tr>
+                    <tr><td>04/Mai</td><td>Neoenergia Cosern (Energia)</td><td class="cat-util">Energia</td><td contenteditable="true">496,82</td></tr>
+                    <tr><td>04/Mai</td><td>TCM TV Cabo Mossoró</td><td class="cat-util">Operacional</td><td contenteditable="true">145,00</td></tr>
+                    <tr><td>05/Mai</td><td>Tarifa de Conta Mensal</td><td>Bancário</td><td contenteditable="true">49,00</td></tr>
+                    <tr><td>06/Mai</td><td>Neoenergia Cosern (Energia)</td><td class="cat-util">Energia</td><td contenteditable="true">1.920,27</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="slide-container dark-slide" style="text-align: center; justify-content: center;">
+        <h1 contenteditable="true" style="color: #d4af37; font-size: 70px;">T∴F∴A∴</h1>
+        <div style="width: 100px; height: 3px; background: #d4af37; margin: 30px auto;"></div>
+        <p contenteditable="true" style="font-size: 24px;">TESOURARIA - LOJA JERÔNIMO ROSADO Nº 1994</p>
+        <p contenteditable="true" style="font-size: 16px; opacity: 0.7; margin-top: 40px; max-width: 800px; margin-left: auto; margin-right: auto;">
+            "A transparência na gestão dos metais é o alicerce que garante a harmonia e o sustento das nossas colunas sagradas."
+        </p>
+        <p style="margin-top: 50px; font-weight: bold;">Mossoró-RN, Maio de 2026</p>
+    </div>
+
+</body>
+</html>
