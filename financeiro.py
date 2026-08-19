@@ -276,6 +276,35 @@ def init_db():
         )
     """)
     
+    # === Tabela de Agendamentos de Pagamentos ===
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS agendamentos_pagamentos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            descricao TEXT NOT NULL,
+            valor_total REAL NOT NULL,
+            numero_parcelas INTEGER NOT NULL,
+            data_primeira_parcela TEXT NOT NULL,
+            intervalo_dias INTEGER DEFAULT 30,
+            status TEXT DEFAULT 'Pendente',
+            data_criacao TEXT NOT NULL,
+            observacoes TEXT
+        )
+    """)
+    
+    # === Tabela de Parcelas ===
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS parcelas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agendamento_id INTEGER NOT NULL,
+            numero_parcela INTEGER NOT NULL,
+            valor_parcela REAL NOT NULL,
+            data_vencimento TEXT NOT NULL,
+            status TEXT DEFAULT 'Pendente',
+            data_pagamento TEXT,
+            FOREIGN KEY (agendamento_id) REFERENCES agendamentos_pagamentos(id) ON DELETE CASCADE
+        )
+    """)
+    
     # Adicionando o vínculo na tabela de transações para evitar duplicidade no Livro Caixa
     try:
         cursor.execute("ALTER TABLE transacoes ADD COLUMN id_sicredi TEXT UNIQUE")
@@ -355,7 +384,15 @@ def formatar_moeda(valor):
 
 def formatar_data(data_str):
     if isinstance(data_str, str):
-        return datetime.strptime(data_str, '%Y-%m-%d').strftime('%d/%m/%Y')
+        try:
+            # Tenta formatar com hora primeiro
+            return datetime.strptime(data_str, '%Y-%m-%d %H:%M:%S').strftime('%d/%m/%Y')
+        except ValueError:
+            try:
+                # Se falhar, tenta sem hora
+                return datetime.strptime(data_str, '%Y-%m-%d').strftime('%d/%m/%Y')
+            except ValueError:
+                return data_str
     elif isinstance(data_str, datetime):
         return data_str.strftime('%d/%m/%Y')
     return data_str
@@ -543,7 +580,7 @@ st.sidebar.markdown("""
     <h2 class="sidebar-title">🏛️ Menu de Navegação</h2>
 """, unsafe_allow_html=True)
 
-modulo = st.sidebar.radio("", [
+modulo = st.sidebar.radio("Selecione um módulo:", [
     "📊 Visão Geral (Dashboard)",
     "📝 Livro Caixa (Lançar e Editar)",
     "🏦 Conciliação Bancária",
@@ -555,6 +592,7 @@ modulo = st.sidebar.radio("", [
     "📰 Notícias e Informações",
     "📅 Eventos e Agenda",
     "🎂 Aniversariantes",
+    "📅 Agendador de Pagamentos",
     "💾 Backup e Restauração"
 ], label_visibility="collapsed")
 
@@ -1756,7 +1794,399 @@ elif modulo == "🎂 Aniversariantes":
         st.info("Nenhum obreiro cadastrado.")
 
 # ==========================================
-# MÓDULO 8: BACKUP E RESTAURAÇÃO
+# MÓDULO 8: AGENDADOR DE PAGAMENTOS
+# ==========================================
+elif modulo == "📅 Agendador de Pagamentos":
+    st.subheader("📅 Agendador de Pagamentos e Contas a Pagar")
+    
+    aba_criar, aba_listar, aba_contas_pagar = st.tabs(["Criar Agendamento", "Agendamentos", "Contas a Pagar"])
+    
+    with aba_criar:
+        st.write("### Criar Novo Agendamento de Pagamento")
+        st.info("Crie agendamentos para parcelamentos e contas recorrentes com alertas automáticos.")
+        
+        with st.form("form_agendamento"):
+            col1, col2 = st.columns(2)
+            with col1:
+                descricao = st.text_input("Descrição do Pagamento", placeholder="Ex: Parcelamento GOB/RN")
+                valor_total = st.number_input("Valor Total (R$)", min_value=0.01, step=0.01)
+            with col2:
+                numero_parcelas = st.number_input("Número de Parcelas", min_value=1, max_value=120, value=1)
+                data_primeira = st.date_input("Data da Primeira Parcela", value=date.today())
+            
+            intervalo_dias = st.selectbox("Intervalo entre Parcelas", [30, 15, 7, 60, 90], index=0, 
+                                         help="Dias entre cada parcela (30 = mensal)")
+            observacoes = st.text_area("Observações", placeholder="Informações adicionais sobre o pagamento")
+            
+            if st.form_submit_button("Criar Agendamento"):
+                if descricao and valor_total > 0 and numero_parcelas > 0:
+                    try:
+                        conn = sqlite3.connect(DB_PATH)
+                        cursor = conn.cursor()
+                        
+                        # Inserir agendamento principal
+                        data_criacao = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        cursor.execute("""
+                            INSERT INTO agendamentos_pagamentos 
+                            (descricao, valor_total, numero_parcelas, data_primeira_parcela, intervalo_dias, status, data_criacao, observacoes)
+                            VALUES (?, ?, ?, ?, ?, 'Pendente', ?, ?)
+                        """, (descricao, valor_total, numero_parcelas, data_primeira.strftime('%Y-%m-%d'), 
+                              intervalo_dias, data_criacao, observacoes))
+                        
+                        agendamento_id = cursor.lastrowid
+                        
+                        # Calcular e inserir parcelas
+                        valor_parcela = valor_total / numero_parcelas
+                        for i in range(numero_parcelas):
+                            data_vencimento = datetime.strptime(data_primeira.strftime('%Y-%m-%d'), '%Y-%m-%d')
+                            data_vencimento = data_vencimento + pd.Timedelta(days=i*intervalo_dias)
+                            
+                            cursor.execute("""
+                                INSERT INTO parcelas 
+                                (agendamento_id, numero_parcela, valor_parcela, data_vencimento, status)
+                                VALUES (?, ?, ?, ?, 'Pendente')
+                            """, (agendamento_id, i+1, valor_parcela, data_vencimento.strftime('%Y-%m-%d')))
+                        
+                        conn.commit()
+                        conn.close()
+                        
+                        st.success(f"✅ Agendamento criado com sucesso! {numero_parcelas} parcelas de R$ {valor_parcela:.2f}")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao criar agendamento: {str(e)}")
+                else:
+                    st.error("Preencha todos os campos obrigatórios.")
+    
+    with aba_listar:
+        st.write("### Agendamentos de Pagamentos")
+        
+        df_agendamentos = buscar_dados("""
+            SELECT id, descricao, valor_total, numero_parcelas, data_primeira_parcela, 
+                   intervalo_dias, status, data_criacao, observacoes
+            FROM agendamentos_pagamentos 
+            ORDER BY data_criacao DESC
+        """)
+        
+        if not df_agendamentos.empty:
+            for index, row in df_agendamentos.iterrows():
+                with st.expander(f"📋 {row['descricao']} - {formatar_moeda(row['valor_total'])} ({row['numero_parcelas']}x)"):
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.write(f"**Primeira Parcela:** {formatar_data(row['data_primeira_parcela'])}")
+                        st.write(f"**Intervalo:** {row['intervalo_dias']} dias")
+                    with col2:
+                        st.write(f"**Status:** {row['status']}")
+                        st.write(f"**Criado em:** {formatar_data(row['data_criacao'])}")
+                    with col3:
+                        st.write(f"**Valor por Parcela:** {formatar_moeda(row['valor_total'] / row['numero_parcelas'])}")
+                    
+                    if row['observacoes']:
+                        st.markdown(f"**Observações:** {row['observacoes']}")
+                    
+                    # Mostrar parcelas
+                    st.markdown("---")
+                    st.write("**Parcelas:**")
+                    df_parcelas = buscar_dados("""
+                        SELECT id, numero_parcela, valor_parcela, data_vencimento, status, data_pagamento
+                        FROM parcelas 
+                        WHERE agendamento_id = ?
+                        ORDER BY numero_parcela
+                    """, (row['id'],))
+                    
+                    if not df_parcelas.empty:
+                        for _, parcela in df_parcelas.iterrows():
+                            cor_status = "🟢" if parcela['status'] == 'Paga' else "🔴" if parcela['status'] == 'Atrasada' else "🟡"
+                            data_pag = formatar_data(parcela['data_pagamento']) if parcela['data_pagamento'] else "Não pago"
+                            
+                            col_parcela, col_btn_pagar = st.columns([4, 1])
+                            with col_parcela:
+                                st.write(f"{cor_status} **Parcela {parcela['numero_parcela']}/{row['numero_parcelas']}** - "
+                                       f"Vencimento: {formatar_data(parcela['data_vencimento'])} - "
+                                       f"Valor: {formatar_moeda(parcela['valor_parcela'])} - "
+                                       f"Status: {parcela['status']} - Pagamento: {data_pag}")
+                            
+                            with col_btn_pagar:
+                                if parcela['status'] != 'Paga':
+                                    if st.button(f"Pagar", key=f"pagar_parcela_{parcela['id']}"):
+                                        st.session_state['pagar_parcela_id'] = parcela['id']
+                                        st.session_state['pagar_parcela_valor'] = parcela['valor_parcela']
+                                        st.session_state['pagar_parcela_desc'] = row['descricao']
+                                        st.session_state['pagar_parcela_num'] = parcela['numero_parcela']
+                                        st.rerun()
+                    
+                    # Botões de ação
+                    st.markdown("---")
+                    col_btn1, col_btn2, col_btn3 = st.columns(3)
+                    
+                    with col_btn1:
+                        if st.button(f"Marcar como PAGO", key=f"concluir_{row['id']}"):
+                            executar_comando("UPDATE agendamentos_pagamentos SET status = 'Concluído' WHERE id = ?", (row['id'],))
+                            st.success("Agendamento marcado como concluído!")
+                            st.rerun()
+                    
+                    with col_btn2:
+                        if st.button(f"Excluir Agendamento", key=f"excluir_{row['id']}", type="secondary"):
+                            executar_comando("DELETE FROM parcelas WHERE agendamento_id = ?", (row['id'],))
+                            executar_comando("DELETE FROM agendamentos_pagamentos WHERE id = ?", (row['id'],))
+                            st.success("Agendamento excluído!")
+                            st.rerun()
+        else:
+            st.info("Nenhum agendamento encontrado.")
+        
+        # Modal para pagamento de parcela específica
+        if 'pagar_parcela_id' in st.session_state and st.session_state['pagar_parcela_id']:
+            st.markdown("---")
+            st.subheader("💳 Registrar Pagamento de Parcela")
+            
+            # Buscar categorias disponíveis
+            df_cats = buscar_dados("SELECT nome FROM categorias ORDER BY nome")
+            lista_cats = df_cats['nome'].tolist() if not df_cats.empty else ["Outros"]
+            
+            with st.form("form_pagamento_parcela_individual"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    data_pagamento = st.date_input("Data do Pagamento", value=date.today())
+                with col2:
+                    categoria_pagamento = st.selectbox("Categoria do Lançamento:", lista_cats)
+                
+                descricao_pagamento = st.text_input("Descrição do Pagamento:", 
+                                                   placeholder="Descreva o pagamento para o livro caixa")
+                
+                st.info(f"Pagamento: {st.session_state['pagar_parcela_desc']} - "
+                       f"Parcela {st.session_state['pagar_parcela_num']} - "
+                       f"Valor: {formatar_moeda(st.session_state['pagar_parcela_valor'])}")
+                
+                col_form1, col_form2 = st.columns(2)
+                with col_form1:
+                    if st.form_submit_button("Confirmar Pagamento e Lançar no Caixa"):
+                        if descricao_pagamento.strip():
+                            try:
+                                # Atualizar status da parcela
+                                executar_comando("""
+                                    UPDATE parcelas 
+                                    SET status = 'Paga', data_pagamento = ? 
+                                    WHERE id = ?
+                                """, (data_pagamento.strftime('%Y-%m-%d'), st.session_state['pagar_parcela_id']))
+                                
+                                # Criar lançamento no livro caixa
+                                data_formatada = datetime.strptime(data_pagamento.strftime('%Y-%m-%d'), '%Y-%m-%d')
+                                mes_comp = data_formatada.strftime('%B')
+                                ano_comp = data_formatada.strftime('%Y')
+                                
+                                descricao_completa = f"{st.session_state['pagar_parcela_desc']} - Parcela {st.session_state['pagar_parcela_num']} - {descricao_pagamento}"
+                                
+                                executar_comando("""
+                                    INSERT INTO transacoes 
+                                    (data, tipo, categoria, descricao, valor, mes_competencia, ano_competencia, tipo_caixa)
+                                    VALUES (?, 'Saída', ?, ?, ?, ?, ?, 'Bancário')
+                                """, (data_pagamento.strftime('%Y-%m-%d'), categoria_pagamento, 
+                                      descricao_completa, st.session_state['pagar_parcela_valor'], 
+                                      mes_comp, ano_comp))
+                                
+                                # Limpar session state
+                                del st.session_state['pagar_parcela_id']
+                                del st.session_state['pagar_parcela_valor']
+                                del st.session_state['pagar_parcela_desc']
+                                del st.session_state['pagar_parcela_num']
+                                
+                                st.success(f"✅ Pagamento registrado e lançamento criado no livro caixa!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erro ao processar pagamento: {str(e)}")
+                        else:
+                            st.error("Por favor, preencha a descrição do pagamento.")
+                
+                with col_form2:
+                    if st.form_submit_button("Cancelar"):
+                        del st.session_state['pagar_parcela_id']
+                        del st.session_state['pagar_parcela_valor']
+                        del st.session_state['pagar_parcela_desc']
+                        del st.session_state['pagar_parcela_num']
+                        st.rerun()
+    
+    with aba_contas_pagar:
+        st.write("### Relatório de Contas a Pagar")
+        st.info("Visualize todas as contas pendentes e organize seus pagamentos.")
+        
+        # Filtros
+        col_filtro1, col_filtro2 = st.columns(2)
+        with col_filtro1:
+            filtro_status = st.selectbox("Filtrar por Status", ["Todas", "Pendente", "Paga", "Atrasada"])
+        with col_filtro2:
+            data_referencia = st.date_input("Data de Referência", value=date.today())
+        
+        # Buscar parcelas com base no filtro
+        if filtro_status == "Todas":
+            query_parcelas = """
+                SELECT p.id, p.numero_parcela, p.valor_parcela, p.data_vencimento, p.status, p.data_pagamento,
+                       a.descricao as agendamento_descricao, a.observacoes
+                FROM parcelas p
+                JOIN agendamentos_pagamentos a ON p.agendamento_id = a.id
+                ORDER BY p.data_vencimento ASC
+            """
+            params_parcelas = ()
+        else:
+            query_parcelas = """
+                SELECT p.id, p.numero_parcela, p.valor_parcela, p.data_vencimento, p.status, p.data_pagamento,
+                       a.descricao as agendamento_descricao, a.observacoes
+                FROM parcelas p
+                JOIN agendamentos_pagamentos a ON p.agendamento_id = a.id
+                WHERE p.status = ?
+                ORDER BY p.data_vencimento ASC
+            """
+            params_parcelas = (filtro_status,)
+        
+        df_contas = buscar_dados(query_parcelas, params_parcelas)
+        
+        if not df_contas.empty:
+            # Atualizar status de parcelas atrasadas
+            hoje = date.today()
+            for index, row in df_contas.iterrows():
+                if row['status'] == 'Pendente':
+                    data_venc = datetime.strptime(row['data_vencimento'], '%Y-%m-%d').date()
+                    if data_venc < hoje:
+                        executar_comando("UPDATE parcelas SET status = 'Atrasada' WHERE id = ?", (row['id'],))
+            
+            # Recarregar dados após atualização
+            df_contas = buscar_dados(query_parcelas, params_parcelas)
+            
+            # Calcular totais
+            total_pendente = df_contas[df_contas['status'] == 'Pendente']['valor_parcela'].sum()
+            total_atrasado = df_contas[df_contas['status'] == 'Atrasada']['valor_parcela'].sum()
+            total_pagar = total_pendente + total_atrasado
+            
+            # Mostrar cards de resumo
+            col_card1, col_card2, col_card3 = st.columns(3)
+            col_card1.metric("A Pagar (Pendente)", formatar_moeda(total_pendente))
+            col_card2.metric("Em Atraso", formatar_moeda(total_atrasado), delta_color="inverse")
+            col_card3.metric("Total a Pagar", formatar_moeda(total_pagar))
+            
+            st.markdown("---")
+            
+            # Alertas de vencimento próximo (1 dia antes)
+            amanha = hoje + pd.Timedelta(days=1)
+            df_alertas = df_contas[
+                (df_contas['status'].isin(['Pendente', 'Atrasada'])) &
+                (pd.to_datetime(df_contas['data_vencimento']).dt.date <= amanha)
+            ]
+            
+            if not df_alertas.empty:
+                st.warning(f"⚠️ **ALERTA:** {len(df_alertas)} parcela(s) vence(m) nos próximos dias!")
+                for _, alerta in df_alertas.iterrows():
+                    data_venc = datetime.strptime(alerta['data_vencimento'], '%Y-%m-%d').date()
+                    if data_venc == hoje:
+                        st.error(f"🔴 **VENCE HOJE:** {alerta['agendamento_descricao']} - Parcela {alerta['numero_parcela']} - {formatar_moeda(alerta['valor_parcela'])}")
+                    elif data_venc == amanha:
+                        st.warning(f"🟡 **VENCE AMANHÃ:** {alerta['agendamento_descricao']} - Parcela {alerta['numero_parcela']} - {formatar_moeda(alerta['valor_parcela'])}")
+                    else:
+                        st.info(f"🟠 **VENCIDA:** {alerta['agendamento_descricao']} - Parcela {alerta['numero_parcela']} - {formatar_moeda(alerta['valor_parcela'])}")
+                
+                st.markdown("---")
+            
+            # Tabela detalhada
+            st.write("### Detalhamento das Contas")
+            df_visualizacao = df_contas.copy()
+            df_visualizacao['valor_parcela'] = df_visualizacao['valor_parcela'].apply(formatar_moeda)
+            df_visualizacao['data_vencimento'] = df_visualizacao['data_vencimento'].apply(formatar_data)
+            df_visualizacao['data_pagamento'] = df_visualizacao['data_pagamento'].apply(lambda x: formatar_data(x) if x else 'Não pago')
+            
+            df_visualizacao = df_visualizacao.rename(columns={
+                'agendamento_descricao': 'Descrição',
+                'numero_parcela': 'Parcela',
+                'valor_parcela': 'Valor',
+                'data_vencimento': 'Vencimento',
+                'status': 'Status',
+                'data_pagamento': 'Data Pagamento'
+            })
+            
+            st.dataframe(df_visualizacao[['Descrição', 'Parcela', 'Valor', 'Vencimento', 'Status', 'Data Pagamento']], 
+                        use_container_width=True, hide_index=True)
+            
+            # Ações em lote
+            st.markdown("---")
+            st.write("### Ações em Lote")
+            
+            # Marcar parcela como paga
+            parcelas_pendentes = df_contas[df_contas['status'] != 'Paga']
+            if not parcelas_pendentes.empty:
+                opcoes_parcelas = [f"{row['agendamento_descricao']} - Parcela {row['numero_parcela']}" for _, row in parcelas_pendentes.iterrows()]
+                parcela_pagar = st.selectbox("Selecione a parcela para marcar como paga:", opcoes_parcelas)
+                
+                if parcela_pagar:
+                    # Buscar categorias disponíveis
+                    df_cats = buscar_dados("SELECT nome FROM categorias ORDER BY nome")
+                    lista_cats = df_cats['nome'].tolist() if not df_cats.empty else ["Outros"]
+                    
+                    with st.form("form_pagamento_parcela"):
+                        col_pagar1, col_pagar2 = st.columns(2)
+                        with col_pagar1:
+                            data_pagamento = st.date_input("Data do Pagamento", value=date.today())
+                        with col_pagar2:
+                            categoria_pagamento = st.selectbox("Categoria do Lançamento:", lista_cats)
+                        
+                        descricao_pagamento = st.text_input("Descrição do Pagamento:", 
+                                                           placeholder="Descreva o pagamento para o livro caixa")
+                        
+                        # Encontrar a parcela selecionada para mostrar informações
+                        parcela_selecionada = parcelas_pendentes[
+                            parcelas_pendentes['agendamento_descricao'] + ' - Parcela ' + 
+                            parcelas_pendentes['numero_parcela'].astype(str) == parcela_pagar
+                        ].iloc[0]
+                        
+                        st.info(f"Valor: {formatar_moeda(parcela_selecionada['valor_parcela'])} | "
+                               f"Vencimento: {formatar_data(parcela_selecionada['data_vencimento'])}")
+                        
+                        if st.form_submit_button("Confirmar Pagamento e Lançar no Caixa"):
+                            if descricao_pagamento.strip():
+                                try:
+                                    # Atualizar status da parcela
+                                    executar_comando("""
+                                        UPDATE parcelas 
+                                        SET status = 'Paga', data_pagamento = ? 
+                                        WHERE id = ?
+                                    """, (data_pagamento.strftime('%Y-%m-%d'), parcela_selecionada['id']))
+                                    
+                                    # Criar lançamento no livro caixa
+                                    data_formatada = datetime.strptime(data_pagamento.strftime('%Y-%m-%d'), '%Y-%m-%d')
+                                    mes_comp = data_formatada.strftime('%B')
+                                    ano_comp = data_formatada.strftime('%Y')
+                                    
+                                    descricao_completa = f"{parcela_selecionada['agendamento_descricao']} - {descricao_pagamento}"
+                                    
+                                    executar_comando("""
+                                        INSERT INTO transacoes 
+                                        (data, tipo, categoria, descricao, valor, mes_competencia, ano_competencia, tipo_caixa)
+                                        VALUES (?, 'Saída', ?, ?, ?, ?, ?, 'Bancário')
+                                    """, (data_pagamento.strftime('%Y-%m-%d'), categoria_pagamento, 
+                                          descricao_completa, parcela_selecionada['valor_parcela'], 
+                                          mes_comp, ano_comp))
+                                    
+                                    st.success(f"✅ Pagamento registrado e lançamento criado no livro caixa!")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Erro ao processar pagamento: {str(e)}")
+                            else:
+                                st.error("Por favor, preencha a descrição do pagamento.")
+            
+            # Exportar relatório
+            st.markdown("---")
+            st.write("### Exportar Relatório")
+            df_export = df_contas[['agendamento_descricao', 'numero_parcela', 'valor_parcela', 'data_vencimento', 'status']].copy()
+            df_export.columns = ['Descrição', 'Parcela', 'Valor', 'Vencimento', 'Status']
+            csv_data = df_export.to_csv(index=False, sep=';', encoding='utf-8-sig')
+            
+            st.download_button(
+                label="📊 Baixar Relatório de Contas a Pagar (CSV)",
+                data=csv_data,
+                file_name=f"Contas_a_Pagar_{date.today().strftime('%Y-%m-%d')}.csv",
+                mime="text/csv",
+                key="btn_export_contas"
+            )
+        else:
+            st.info("Nenhuma conta a pagar encontrada.")
+
+# ==========================================
+# MÓDULO 9: BACKUP E RESTAURAÇÃO
 # ==========================================
 elif modulo == "💾 Backup e Restauração":
     st.subheader("💾 Backup e Restauração do Banco de Dados")
