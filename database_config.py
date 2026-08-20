@@ -37,6 +37,22 @@ def init_db():
         )
     """)
     
+    # Adicionar colunas que podem não existir em tabelas antigas
+    try:
+        cursor.execute("ALTER TABLE obreiros ADD COLUMN data_nascimento TEXT")
+    except sqlite3.OperationalError:
+        pass  # A coluna já existe
+    
+    try:
+        cursor.execute("ALTER TABLE obreiros ADD COLUMN email TEXT")
+    except sqlite3.OperationalError:
+        pass  # A coluna já existe
+    
+    try:
+        cursor.execute("ALTER TABLE obreiros ADD COLUMN telefone TEXT")
+    except sqlite3.OperationalError:
+        pass  # A coluna já existe
+    
     # Tabela de Categorias
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS categorias (
@@ -199,14 +215,19 @@ def init_db():
 
 def buscar_dados(query, params=()):
     """Executa uma query SELECT e retorna os resultados como DataFrame"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute(query, params)
-    resultados = cursor.fetchall()
-    colunas = [desc[0] for desc in cursor.description]
-    cursor.close()
-    conn.close()
-    return pd.DataFrame(resultados, columns=colunas)
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        resultados = cursor.fetchall()
+        colunas = [desc[0] for desc in cursor.description]
+        cursor.close()
+        conn.close()
+        return pd.DataFrame(resultados, columns=colunas)
+    except sqlite3.OperationalError as e:
+        print(f"Erro na query: {e}")
+        print(f"Query: {query}")
+        return pd.DataFrame()
 
 def executar_comando(query, params=()):
     """Executa um comando SQL (INSERT, UPDATE, DELETE)"""

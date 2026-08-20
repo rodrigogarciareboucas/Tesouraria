@@ -1313,6 +1313,129 @@ elif modulo == "👤 Cadastro de Obreiros":
                         st.error("CIM incorreto.")
     else:
         st.info("Nenhum obreiro cadastrado.")
+    
+    # Botão de Relatório de Obreiros Cadastrados
+    st.markdown("---")
+    st.subheader("📊 Relatório de Obreiros Cadastrados")
+    
+    # Verificar quais colunas existem na tabela
+    df_colunas = buscar_dados("PRAGMA table_info(obreiros)")
+    colunas_existentes = df_colunas['name'].tolist() if not df_colunas.empty else []
+    
+    # Construir query dinâmica baseada nas colunas existentes
+    colunas_desejadas = ['id', 'nome', 'cim', 'grau', 'valor_mensalidade', 'isento', 'data_admissao']
+    colunas_opcionais = ['data_nascimento', 'email', 'telefone']
+    
+    # Adicionar apenas colunas que existem
+    for col in colunas_opcionais:
+        if col in colunas_existentes:
+            colunas_desejadas.append(col)
+    
+    query_colunas = ', '.join(colunas_desejadas)
+    df_relatorio_obreiros = buscar_dados(f"""
+        SELECT {query_colunas}
+        FROM obreiros 
+        ORDER BY nome
+    """)
+    
+    if not df_relatorio_obreiros.empty:
+        # Mostrar tabela completa
+        df_visualizacao = df_relatorio_obreiros.copy()
+        df_visualizacao['isento'] = df_visualizacao['isento'].apply(lambda x: 'Sim' if x == 1 else 'Não')
+        df_visualizacao['valor_mensalidade'] = df_visualizacao['valor_mensalidade'].apply(formatar_moeda)
+        df_visualizacao['data_admissao'] = df_visualizacao['data_admissao'].apply(formatar_data)
+        
+        # Processar colunas opcionais se existirem
+        if 'data_nascimento' in df_visualizacao.columns:
+            df_visualizacao['data_nascimento'] = df_visualizacao['data_nascimento'].apply(lambda x: formatar_data(x) if x else 'Não informado')
+        if 'email' in df_visualizacao.columns:
+            df_visualizacao['email'] = df_visualizacao['email'].apply(lambda x: x if x else 'Não informado')
+        if 'telefone' in df_visualizacao.columns:
+            df_visualizacao['telefone'] = df_visualizacao['telefone'].apply(lambda x: x if x else 'Não informado')
+        
+        # Renomear colunas baseado no que existe
+        colunas_renomear = {
+            'id': 'ID',
+            'nome': 'Nome',
+            'cim': 'CIM',
+            'grau': 'Grau',
+            'valor_mensalidade': 'Mensalidade',
+            'isento': 'Isento',
+            'data_admissao': 'Data Admissão'
+        }
+        
+        # Adicionar renomeação opcional apenas se a coluna existir
+        if 'data_nascimento' in df_visualizacao.columns:
+            colunas_renomear['data_nascimento'] = 'Data Nascimento'
+        if 'email' in df_visualizacao.columns:
+            colunas_renomear['email'] = 'E-mail'
+        if 'telefone' in df_visualizacao.columns:
+            colunas_renomear['telefone'] = 'Telefone'
+        
+        df_visualizacao = df_visualizacao.rename(columns=colunas_renomear)
+        
+        st.dataframe(df_visualizacao, use_container_width=True, hide_index=True)
+        
+        # Exportar relatório
+        st.markdown("---")
+        st.write("### Exportar Relatório")
+        
+        # Preparar dados para exportação
+        df_export = df_relatorio_obreiros.copy()
+        df_export['isento'] = df_export['isento'].apply(lambda x: 'Sim' if x == 1 else 'Não')
+        
+        # Renomear colunas para exportação
+        colunas_export = {
+            'id': 'ID',
+            'nome': 'Nome',
+            'cim': 'CIM',
+            'grau': 'Grau',
+            'valor_mensalidade': 'Mensalidade',
+            'isento': 'Isento',
+            'data_admissao': 'Data Admissão'
+        }
+        
+        if 'data_nascimento' in df_export.columns:
+            colunas_export['data_nascimento'] = 'Data Nascimento'
+        if 'email' in df_export.columns:
+            colunas_export['email'] = 'E-mail'
+        if 'telefone' in df_export.columns:
+            colunas_export['telefone'] = 'Telefone'
+        
+        df_export = df_export.rename(columns=colunas_export)
+        csv_data = df_export.to_csv(index=False, sep=';', encoding='utf-8-sig')
+        
+        st.download_button(
+            label="📊 Baixar Relatório Completo de Obreiros (CSV)",
+            data=csv_data,
+            file_name=f"Relatorio_Obreiros_{date.today().strftime('%Y-%m-%d')}.csv",
+            mime="text/csv",
+            key="btn_export_obreiros"
+        )
+        
+        # Estatísticas do quadro
+        st.markdown("---")
+        st.write("### Estatísticas do Quadro")
+        
+        total_obreiros = len(df_relatorio_obreiros)
+        total_isentos = df_relatorio_obreiros['isento'].sum()
+        total_pagantes = total_obreiros - total_isentos
+        receita_mensal_potencial = df_relatorio_obreiros[df_relatorio_obreiros['isento'] == 0]['valor_mensalidade'].sum()
+        
+        col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
+        col_stat1.metric("Total de Obreiros", total_obreiros)
+        col_stat2.metric("Obreiros Isentos", total_isentos)
+        col_stat3.metric("Obreiros Pagantes", total_pagantes)
+        col_stat4.metric("Receita Mensal Potencial", formatar_moeda(receita_mensal_potencial))
+        
+        # Distribuição por grau
+        st.markdown("---")
+        st.write("### Distribuição por Grau")
+        df_grau = df_relatorio_obreiros['grau'].value_counts().reset_index()
+        df_grau.columns = ['Grau', 'Quantidade']
+        st.dataframe(df_grau, use_container_width=True, hide_index=True)
+    else:
+        st.info("Nenhum obreiro cadastrado para gerar relatório.")
 
 # ==========================================
 # MÓDULO NOVO: CADASTRO DE USUÁRIOS
