@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Administração de Rifas - Loja Maçônica Jerônimo Rosado 1994">
+    <title>Admin Rifas | Jerônimo Rosado 1994</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="icon" type="image/png" href="../img/logo.png">
+</head>
+<body>
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <a href="../index.html" class="nav-logo">
+                <img src="../img/logo.png" alt="Logo Jerônimo Rosado" class="logo-img">
+                <span class="logo-text">Jerônimo Rosado 1994</span>
+            </a>
+            <button class="nav-toggle" id="navToggle" aria-label="Abrir menu" aria-expanded="false">
+                <span></span><span></span><span></span>
+            </button>
+            <ul class="nav-menu" id="navMenu">
+                <li><a href="../index.html" class="nav-link">Início</a></li>
+                <li><a href="../index.html#sobre" class="nav-link">Sobre</a></li>
+                <li><a href="../index.html#sistema" class="nav-link">Sistema</a></li>
+                <li><a href="rifas.html" class="nav-link">Rifas</a></li>
+                <li><a href="doacoes.html" class="nav-link">Doações</a></li>
+                <li><a href="benfeitorias.html" class="nav-link">Benfeitorias</a></li>
+                <li><a href="../index.html#contato" class="nav-link">Contato</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <header class="hero" style="min-height: 50vh; padding-top: 72px;">
+        <div class="hero-bg"></div>
+        <div class="hero-content">
+            <div class="hero-badge">Área Administrativa</div>
+            <h1 class="hero-title" style="font-size: 2.5rem;">Administração de Rifas</h1>
+            <p class="hero-subtitle">Configure e lance novas rifas</p>
+        </div>
+    </header>
+
+    <section class="section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Configuração</span>
+                <h2 class="section-title">Nova Rifa</h2>
+                <div class="section-line"></div>
+            </div>
+
+            <div style="background: var(--white); padding: 40px; border-radius: var(--radius-lg); box-shadow: var(--shadow); border: 1px solid rgba(212, 175, 55, 0.15);">
+                <form class="form" id="rifaForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="rifaNome">Nome da Rifa *</label>
+                            <input type="text" id="rifaNome" name="rifaNome" required placeholder="Ex: Rifa Natal 2026">
+                        </div>
+                        <div class="form-group">
+                            <label for="rifaPremio">Prêmio Principal *</label>
+                            <input type="text" id="rifaPremio" name="rifaPremio" required placeholder="Ex: Notebook Dell">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="rifaValor">Valor do Bilhete (R$) *</label>
+                            <input type="number" id="rifaValor" name="rifaValor" required min="1" step="0.01" placeholder="10,00">
+                        </div>
+                        <div class="form-group">
+                            <label for="rifaQuantidade">Quantidade de Bilhetes *</label>
+                            <input type="number" id="rifaQuantidade" name="rifaQuantidade" required min="10" placeholder="100">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="rifaDataSorteio">Data do Sorteio *</label>
+                            <input type="date" id="rifaDataSorteio" name="rifaDataSorteio" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="rifaHoraSorteio">Hora do Sorteio *</label>
+                            <input type="time" id="rifaHoraSorteio" name="rifaHoraSorteio" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="rifaDataInicio">Data de Início *</label>
+                            <input type="date" id="rifaDataInicio" name="rifaDataInicio" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="rifaDataFim">Data de Encerramento *</label>
+                            <input type="date" id="rifaDataFim" name="rifaDataFim" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="rifaDescricao">Descrição da Rifa</label>
+                        <textarea id="rifaDescricao" name="rifaDescricao" rows="4" placeholder="Descreva os prêmios, regras e outras informações importantes..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="rifaPremios">Outros Prêmios (um por linha)</label>
+                        <textarea id="rifaPremios" name="rifaPremios" rows="3" placeholder="2º lugar: Tablet&#10;3º lugar: Smartwatch&#10;4º lugar: Kit Maçônico"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="rifaRegras">Regras da Rifa</label>
+                        <textarea id="rifaRegras" name="rifaRegras" rows="3" placeholder="- Sorteio será realizado presencialmente na loja&#10;- Ganhador será contactado por telefone&#10;- Bilhetes não utilizados serão sorteados novamente"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="rifaAtiva" name="rifaAtiva" style="width: auto;" checked>
+                            <span>Ativar rifa imediatamente após lançamento</span>
+                        </label>
+                    </div>
+
+                    <div style="display: flex; gap: 16px; margin-top: 24px;">
+                        <button type="submit" class="btn btn-primary">
+                            <svg viewBox="0 0 24 24" class="send-icon" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                            Lançar Rifa
+                        </button>
+                        <button type="button" class="btn btn-accent" onclick="document.getElementById('rifaForm').reset()">
+                            <svg viewBox="0 0 24 24" class="send-icon" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1018 0 9 9 0 10-18 0z"/><path d="M12 8v4l3 3"/></svg>
+                            Limpar Formulário
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="section-header" style="margin-top: 80px;">
+                <span class="section-tag">Gerenciamento</span>
+                <h2 class="section-title">Rifas Ativas</h2>
+                <div class="section-line"></div>
+            </div>
+
+            <div style="background: var(--white); border-radius: var(--radius-lg); padding: 32px; box-shadow: var(--shadow); border: 1px solid rgba(212, 175, 55, 0.1);">
+                <div id="rifasAtivasContainer">
+                    <div style="text-align: center; padding: 40px;">
+                        <svg viewBox="0 0 24 24" style="width: 80px; height: 80px; color: var(--gold); margin-bottom: 24px;" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="2" y="6" width="20" height="12" rx="2"/>
+                            <circle cx="8" cy="12" r="2"/>
+                            <circle cx="12" cy="12" r="2"/>
+                            <circle cx="16" cy="12" r="2"/>
+                            <line x1="2" y1="10" x2="22" y2="10"/>
+                            <line x1="6" y1="6" x2="6" y2="18"/>
+                            <line x1="18" y1="6" x2="18" y2="18"/>
+                        </svg>
+                        <h3 style="font-size: 1.3rem; color: var(--brown); margin-bottom: 12px;">Nenhuma Rifa Ativa</h3>
+                        <p style="color: var(--dark-text); margin-bottom: 24px;">Utilize o formulário acima para lançar uma nova rifa.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-brand"><img src="../img/logo.png" alt="Logo" class="footer-logo"><div><h4>Loja Maçônica Jerônimo Rosado 1994</h4><p>RESP.: E BENF. | LOJ. | SIMB.: JERONIMO ROSADO</p></div></div>
+            <div class="footer-links">
+                <div class="footer-col"><h5>Portal</h5><ul class="footer-menu"><li><a href="../index.html">Início</a></li><li><a href="../index.html#sobre">Sobre a Loja</a></li><li><a href="../index.html#sistema">Sistema</a></li><li><a href="rifas.html">Rifas</a></li><li><a href="doacoes.html">Doações</a></li><li><a href="benfeitorias.html">Benfeitorias</a></li></ul></div>
+                <div class="footer-col"><h5>Acesso Rápido</h5><ul class="footer-menu"><li><a href="sistema.html">Acessar Sistema</a></li><li><a href="rifas.html">Todas as Rifas</a></li><li><a href="doacoes.html">Formulário de Doação</a></li><li><a href="benfeitorias.html">Nossas Ações</a></li></ul></div>
+            </div>
+            <div class="footer-bottom"><p>&copy; 1994-2026 Loja Maçônica Jerônimo Rosado 1994. Todos os direitos reservados.</p><p class="footer-note">Portal informativo — conteúdo sujeito a atualizações.</p></div>
+        </div>
+    </footer>
+
+    <script src="../js/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const rifaForm = document.getElementById('rifaForm');
+            const rifasAtivasContainer = document.getElementById('rifasAtivasContainer');
+
+            // Carregar rifas salvas
+            function carregarRifas() {
+                const rifas = JSON.parse(localStorage.getItem('rifas') || '[]');
+                if (rifas.length === 0) {
+                    rifasAtivasContainer.innerHTML = `
+                        <div style="text-align: center; padding: 40px;">
+                            <svg viewBox="0 0 24 24" style="width: 80px; height: 80px; color: var(--gold); margin-bottom: 24px;" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="2" y="6" width="20" height="12" rx="2"/>
+                                <circle cx="8" cy="12" r="2"/>
+                                <circle cx="12" cy="12" r="2"/>
+                                <circle cx="16" cy="12" r="2"/>
+                                <line x1="2" y1="10" x2="22" y2="10"/>
+                                <line x1="6" y1="6" x2="6" y2="18"/>
+                                <line x1="18" y1="6" x2="18" y2="18"/>
+                            </svg>
+                            <h3 style="font-size: 1.3rem; color: var(--brown); margin-bottom: 12px;">Nenhuma Rifa Ativa</h3>
+                            <p style="color: var(--dark-text); margin-bottom: 24px;">Utilize o formulário acima para lançar uma nova rifa.</p>
+                        </div>
+                    `;
+                } else {
+                    rifasAtivasContainer.innerHTML = rifas.map((rifa, index) => `
+                        <div style="background: linear-gradient(135deg, rgba(212, 175, 55, 0.05), rgba(119, 161, 209, 0.05)); padding: 24px; border-radius: var(--radius); margin-bottom: 16px; border: 1px solid rgba(212, 175, 55, 0.2);">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+                                <div style="flex: 1; min-width: 200px;">
+                                    <h4 style="font-size: 1.2rem; color: var(--brown); margin-bottom: 8px;">${rifa.nome}</h4>
+                                    <p style="color: var(--dark-text); margin-bottom: 8px;"><strong>Prêmio:</strong> ${rifa.premio}</p>
+                                    <p style="color: var(--dark-text); margin-bottom: 8px;"><strong>Valor:</strong> R$ ${parseFloat(rifa.valor).toFixed(2)}</p>
+                                    <p style="color: var(--dark-text); margin-bottom: 8px;"><strong>Bilhetes:</strong> ${rifa.quantidade}</p>
+                                    <p style="color: var(--dark-text); margin-bottom: 8px;"><strong>Sorteio:</strong> ${formatarData(rifa.dataSorteio)} às ${rifa.horaSorteio}</p>
+                                    <p style="color: var(--dark-text); margin-bottom: 8px;"><strong>Período:</strong> ${formatarData(rifa.dataInicio)} a ${formatarData(rifa.dataFim)}</p>
+                                    ${rifa.ativa ? '<span style="display: inline-block; background: #10b981; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">Ativa</span>' : '<span style="display: inline-block; background: #6b7280; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">Inativa</span>'}
+                                </div>
+                                <div style="display: flex; gap: 8px;">
+                                    <button onclick="editarRifa(${index})" style="padding: 8px 16px; background: var(--gold); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Editar</button>
+                                    <button onclick="excluirRifa(${index})" style="padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Excluir</button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            function formatarData(dataStr) {
+                const data = new Date(dataStr + 'T00:00:00');
+                return data.toLocaleDateString('pt-BR');
+            }
+
+            // Salvar rifa
+            if (rifaForm) {
+                rifaForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(rifaForm);
+                    const data = {
+                        id: Date.now(),
+                        nome: formData.get('rifaNome'),
+                        premio: formData.get('rifaPremio'),
+                        valor: formData.get('rifaValor'),
+                        quantidade: formData.get('rifaQuantidade'),
+                        dataSorteio: formData.get('rifaDataSorteio'),
+                        horaSorteio: formData.get('rifaHoraSorteio'),
+                        dataInicio: formData.get('rifaDataInicio'),
+                        dataFim: formData.get('rifaDataFim'),
+                        descricao: formData.get('rifaDescricao'),
+                        premios: formData.get('rifaPremios'),
+                        regras: formData.get('rifaRegras'),
+                        ativa: formData.get('rifaAtiva') === 'on'
+                    };
+
+                    if (!data.nome || !data.premio || !data.valor || !data.quantidade || !data.dataSorteio || !data.horaSorteio || !data.dataInicio || !data.dataFim) {
+                        alert('Por favor, preencha todos os campos obrigatórios.');
+                        return;
+                    }
+
+                    const rifas = JSON.parse(localStorage.getItem('rifas') || '[]');
+                    rifas.push(data);
+                    localStorage.setItem('rifas', JSON.stringify(rifas));
+
+                    alert('Rifa "' + data.nome + '" lançada com sucesso!');
+                    rifaForm.reset();
+                    carregarRifas();
+                });
+            }
+
+            // Excluir rifa
+            window.excluirRifa = function(index) {
+                if (confirm('Tem certeza que deseja excluir esta rifa?')) {
+                    const rifas = JSON.parse(localStorage.getItem('rifas') || '[]');
+                    rifas.splice(index, 1);
+                    localStorage.setItem('rifas', JSON.stringify(rifas));
+                    carregarRifas();
+                }
+            };
+
+            // Editar rifa
+            window.editarRifa = function(index) {
+                const rifas = JSON.parse(localStorage.getItem('rifas') || '[]');
+                const rifa = rifas[index];
+                
+                document.getElementById('rifaNome').value = rifa.nome;
+                document.getElementById('rifaPremio').value = rifa.premio;
+                document.getElementById('rifaValor').value = rifa.valor;
+                document.getElementById('rifaQuantidade').value = rifa.quantidade;
+                document.getElementById('rifaDataSorteio').value = rifa.dataSorteio;
+                document.getElementById('rifaHoraSorteio').value = rifa.horaSorteio;
+                document.getElementById('rifaDataInicio').value = rifa.dataInicio;
+                document.getElementById('rifaDataFim').value = rifa.dataFim;
+                document.getElementById('rifaDescricao').value = rifa.descricao || '';
+                document.getElementById('rifaPremios').value = rifa.premios || '';
+                document.getElementById('rifaRegras').value = rifa.regras || '';
+                document.getElementById('rifaAtiva').checked = rifa.ativa;
+
+                // Remover a rifa atual para que seja atualizada ao salvar
+                rifas.splice(index, 1);
+                localStorage.setItem('rifas', JSON.stringify(rifas));
+                carregarRifas();
+
+                // Scroll para o formulário
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+
+            // Definir data de início como hoje
+            const hoje = new Date().toISOString().split('T')[0];
+            const dataInicio = document.getElementById('rifaDataInicio');
+            if (dataInicio) dataInicio.value = hoje;
+
+            // Carregar rifas ao iniciar
+            carregarRifas();
+        });
+    </script>
+</body>
+</html>

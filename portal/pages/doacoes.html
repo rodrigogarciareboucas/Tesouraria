@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Doações - Loja Maçônica Jerônimo Rosado 1994">
+    <title>Doações | Jerônimo Rosado 1994</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="icon" type="image/png" href="../img/logo.png">
+</head>
+<body>
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <a href="../index.html" class="nav-logo">
+                <img src="../img/logo.png" alt="Logo Jerônimo Rosado" class="logo-img">
+                <span class="logo-text">Jerônimo Rosado 1994</span>
+            </a>
+            <button class="nav-toggle" id="navToggle" aria-label="Abrir menu" aria-expanded="false">
+                <span></span><span></span><span></span>
+            </button>
+            <ul class="nav-menu" id="navMenu">
+                <li><a href="../index.html" class="nav-link">Início</a></li>
+                <li><a href="../index.html#sobre" class="nav-link">Sobre</a></li>
+                <li><a href="../index.html#sistema" class="nav-link">Sistema</a></li>
+                <li><a href="rifas.html" class="nav-link">Rifas</a></li>
+                <li><a href="doacoes.html" class="nav-link">Doações</a></li>
+                <li><a href="benfeitorias.html" class="nav-link">Benfeitorias</a></li>
+                <li><a href="../index.html#contato" class="nav-link">Contato</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <header class="hero" style="min-height: 60vh; padding-top: 72px;">
+        <div class="hero-bg"></div>
+        <div class="hero-content">
+            <div class="hero-badge">Solidariedade</div>
+            <h1 class="hero-title" style="font-size: 2.8rem;">Doações</h1>
+            <p class="hero-subtitle">Contribua com nossa loja e ajude a manter nossas atividades</p>
+        </div>
+    </header>
+
+    <section class="section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Contribua</span>
+                <h2 class="section-title">Faça sua Doação</h2>
+                <div class="section-line"></div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 48px;">
+                <div>
+                    <h3 style="font-size: 1.4rem; margin-bottom: 20px; color: var(--brown);">Por que Contribuir?</h3>
+                    <p style="color: var(--dark-text); line-height: 1.7; margin-bottom: 24px;">
+                        Sua contribuição ajuda a manter as atividades da Loja Maçônica Jerônimo Rosado 1994, permitindo que continuemos nosso trabalho de formação, beneficência e preservação dos valores maçônicos.
+                    </p>
+                    
+                    <div style="background: var(--white); padding: 24px; border-radius: var(--radius); margin-bottom: 20px; border-left: 4px solid var(--gold);">
+                        <h4 style="color: var(--brown); margin-bottom: 12px;">💡 Seus recursos apoiam:</h4>
+                        <ul style="color: var(--dark-text); line-height: 1.8; margin: 0; padding-left: 20px;">
+                            <li>Manutenção do templo maçônico</li>
+                            <li>Atividades beneficentes da loja</li>
+                            <li>Formação de novos obreiros</li>
+                            <li>Eventos e confraternizações</li>
+                            <li>Preservação de nossa história</li>
+                        </ul>
+                    </div>
+
+                    <div style="background: rgba(212, 175, 55, 0.1); padding: 24px; border-radius: var(--radius);">
+                        <h4 style="color: var(--brown); margin-bottom: 12px;">📋 Informações Bancárias</h4>
+                        <p style="color: var(--dark-text); margin-bottom: 8px;"><strong>Banco:</strong> Sicredi</p>
+                        <p style="color: var(--dark-text); margin-bottom: 8px;"><strong>Agência:</strong> [a ser preenchido]</p>
+                        <p style="color: var(--dark-text); margin-bottom: 8px;"><strong>Conta:</strong> [a ser preenchido]</p>
+                        <p style="color: var(--dark-text); margin-bottom: 8px;"><strong>PIX:</strong> [a ser preenchido]</p>
+                        <p style="font-size: 0.85rem; color: var(--gray-medium); margin-top: 12px;">* Entre em contato para obter os dados bancários completos</p>
+                    </div>
+                </div>
+
+                <div style="background: var(--white); padding: 32px; border-radius: var(--radius-lg); box-shadow: var(--shadow); border: 1px solid rgba(212, 175, 55, 0.15);">
+                    <h3 style="font-size: 1.3rem; margin-bottom: 24px; color: var(--brown);">Formulário de Doação</h3>
+                    <form class="form" id="donationForm">
+                        <div class="form-group">
+                            <label for="donorName">Nome Completo</label>
+                            <input type="text" id="donorName" name="donorName" required placeholder="Seu nome completo">
+                        </div>
+                        <div class="form-group">
+                            <label for="donorEmail">E-mail</label>
+                            <input type="email" id="donorEmail" name="donorEmail" required placeholder="seu@email.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="donorPhone">Telefone</label>
+                            <input type="tel" id="donorPhone" name="donorPhone" placeholder="(84) 99999-9999">
+                        </div>
+                        <div class="form-group">
+                            <label for="donationAmount">Valor da Doação (R$)</label>
+                            <input type="number" id="donationAmount" name="donationAmount" required min="1" step="0.01" placeholder="0,00">
+                        </div>
+                        <div class="form-group">
+                            <label for="donationType">Forma de Pagamento</label>
+                            <select id="donationType" name="donationType" required>
+                                <option value="">Selecione...</option>
+                                <option value="pix">PIX</option>
+                                <option value="transferencia">Transferência Bancária</option>
+                                <option value="deposito">Depósito</option>
+                                <option value="dinheiro">Dinheiro (presencial)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="donationMessage">Mensagem (opcional)</label>
+                            <textarea id="donationMessage" name="donationMessage" rows="3" placeholder="Deixe uma mensagem ou dedicação..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" id="anonymous" name="anonymous" style="width: auto;">
+                                <span>Desejo permanecer anônimo</span>
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-full">
+                            <svg viewBox="0 0 24 24" class="send-icon" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+                            Confirmar Doação
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section" style="background: linear-gradient(135deg, rgba(212, 175, 55, 0.05), rgba(119, 161, 209, 0.05));">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Agradecimento</span>
+                <h2 class="section-title">Nossos Agradecimentos</h2>
+                <div class="section-line"></div>
+            </div>
+            <p style="text-align: center; max-width: 700px; margin: 0 auto; color: var(--dark-text); line-height: 1.8;">
+                Agradecemos a todos os irmãos e benfeitores que contribuem com nossa loja. Cada doação, independentemente do valor, é um gesto de fraternidade que fortalece nossa instituição e nos permite continuar nossa missão.
+            </p>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-brand"><img src="../img/logo.png" alt="Logo" class="footer-logo"><div><h4>Loja Maçônica Jerônimo Rosado 1994</h4><p>RESP.: E BENF. | LOJ. | SIMB.: JERONIMO ROSADO</p></div></div>
+            <div class="footer-links">
+                <div class="footer-col"><h5>Portal</h5><ul class="footer-menu"><li><a href="../index.html">Início</a></li><li><a href="../index.html#sobre">Sobre a Loja</a></li><li><a href="../index.html#sistema">Sistema</a></li><li><a href="rifas.html">Rifas</a></li><li><a href="doacoes.html">Doações</a></li><li><a href="benfeitorias.html">Benfeitorias</a></li></ul></div>
+                <div class="footer-col"><h5>Acesso Rápido</h5><ul class="footer-menu"><li><a href="sistema.html">Acessar Sistema</a></li><li><a href="rifas.html">Todas as Rifas</a></li><li><a href="doacoes.html">Formulário de Doação</a></li><li><a href="benfeitorias.html">Nossas Ações</a></li></ul></div>
+            </div>
+            <div class="footer-bottom"><p>&copy; 1994-2026 Loja Maçônica Jerônimo Rosado 1994. Todos os direitos reservados.</p><p class="footer-note">Portal informativo — conteúdo sujeito a atualizações.</p></div>
+        </div>
+    </footer>
+
+    <script src="../js/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const donationForm = document.getElementById('donationForm');
+            if (donationForm) {
+                donationForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(donationForm);
+                    const data = {
+                        nome: formData.get('donorName'),
+                        email: formData.get('donorEmail'),
+                        telefone: formData.get('donorPhone'),
+                        valor: formData.get('donationAmount'),
+                        tipo: formData.get('donationType'),
+                        mensagem: formData.get('donationMessage'),
+                        anonimo: formData.get('anonymous')
+                    };
+
+                    if (!data.nome || !data.email || !data.valor || !data.tipo) {
+                        alert('Por favor, preencha todos os campos obrigatórios.');
+                        return;
+                    }
+
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(data.email)) {
+                        alert('Por favor, insira um e-mail válido.');
+                        return;
+                    }
+
+                    console.log('Donation data:', data);
+                    alert('Obrigado pela sua doação! Entraremos em contato com as instruções de pagamento.');
+                    donationForm.reset();
+                });
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apuração Financeira - Comemoração Dia dos Pais</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        /* CONFIGURAÇÕES GLOBAIS */
+        * { box-sizing: border-box; }
+        body {
+            background-color: #0f172a;
+            display: grid; gap: 40px;
+            grid-template-columns: 1fr;
+            margin: 0; min-height: 100vh;
+            padding: 40px 0; place-items: center;
+        }
+
+        /* ESTRUTURA DOS SLIDES */
+        .slide-container {
+            width: 1280px; height: 720px;
+            background-color: #ffffff;
+            padding: 50px 60px;
+            display: flex; flex-direction: column;
+            position: relative; overflow: hidden;
+            font-family: 'Lato', sans-serif;
+            border-radius: 4px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+        .slide-container::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; background-color: #fff; }
+        .dark-slide.slide-container::before { background: linear-gradient(135deg, #001f3f 0%, #001122 100%); }
+        .slide-container > * { position: relative; z-index: 1; }
+
+        /* TIPOGRAFIA */
+        h1, h2, h3 { color: #001f3f; font-weight: 700; font-family: 'Poppins', sans-serif; margin: 0; }
+        .dark-slide h1, .dark-slide h2, .dark-slide h3 { color: #fdf5e6 !important; }
+        .slide-title { font-size: 32px; font-weight: 700; color: #001f3f; margin-bottom: 25px; border-bottom: 3px solid #d4af37; padding-bottom: 8px; width: 100%; text-align: left; }
+        .dark-slide .slide-title { color: #d4af37 !important; border-bottom-color: #fdf5e6; }
+        
+        /* EDIÇÃO CLIQUE E DIGITE */
+        [contenteditable="true"] { outline: none; border-radius: 4px; transition: background 0.2s; }
+        [contenteditable="true"]:hover { background: rgba(212, 175, 55, 0.1); cursor: text; }
+
+        /* TABELAS DETALHADAS */
+        .table-wrapper { width: 100%; flex-grow: 1; overflow: hidden; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; background: white; }
+        th { background-color: #001f3f; color: #d4af37; padding: 12px 15px; text-align: left; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; }
+        td { padding: 10px 15px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+        tr:nth-child(even) { background-color: #f8fafc; }
+        
+        /* STATUS CORES */
+        .status-pago { color: #15803d; font-weight: 700; background: #dcfce7; padding: 4px 8px; border-radius: 4px; font-size: 11px; text-transform: uppercase; }
+        .status-pendente { color: #b45309; font-weight: 700; background: #fef3c7; padding: 4px 8px; border-radius: 4px; font-size: 11px; text-transform: uppercase; }
+        .tipo-entrada { color: #16a34a; font-weight: bold; }
+        .tipo-saida { color: #ef4444; font-weight: bold; }
+
+        /* KPI CARDS */
+        .kpi-row { display: flex; gap: 20px; margin-bottom: 25px; }
+        .kpi-card { background: #f8fafc; padding: 18px; border-radius: 8px; flex: 1; border-top: 4px solid #d4af37; text-align: center; }
+        .kpi-value { font-size: 30px; font-weight: 700; color: #001f3f; display: block; }
+        .kpi-label { font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; }
+
+        .masonic-watermark { position: absolute; bottom: 30px; right: 30px; opacity: 0.03; font-size: 120px; color: #001f3f; pointer-events: none; }
+        .print-btn { position: fixed; top: 20px; right: 20px; padding: 12px 25px; background: #d4af37; color: #001f3f; border: none; border-radius: 50px; font-weight: 700; cursor: pointer; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        
+        @media print { .print-btn { display: none; } body { padding: 0; background: white; } .slide-container { box-shadow: none; border: none; page-break-after: always; } }
+    </style>
+</head>
+<body>
+
+    <button class="print-btn" onclick="window.print()"><i class="fa-solid fa-file-pdf"></i> EXPORTAR PRESTAÇÃO PDF</button>
+
+    <div class="slide-container dark-slide">
+        <div style="text-align: center; margin: auto;">
+            <img src="logo.png" alt="Logo" style="width: 160px; height: 160px; border-radius: 50%; border: 4px solid #d4af37; margin-bottom: 25px;">
+            <h1 contenteditable="true" style="font-size: 46px; line-height: 1.2;">Prestação de Contas Extraordinária<br><span style="color:#d4af37;">Comemoração Dia dos Pais</span></h1>
+            <p style="margin-top: 50px; font-weight: bold; color: #d4af37 !important;">A.R.L.S. JERÔNIMO ROSADO Nº 1994</p>
+            <div style="width: 80px; height: 4px; background: #d4af37; margin: 30px auto;"></div>
+            <p style="opacity: 0.7; font-style: italic;">Mossoró - RN • Setembro de 2026</p>
+        </div>
+    </div>
+
+    <div class="slide-container">
+        <h2 class="slide-title">Resumo Financeiro do Evento</h2>
+        <div class="kpi-row">
+            <div class="kpi-card"><span class="kpi-label">Receita Arrecadada</span><span class="kpi-value" style="color:#16a34a;" contenteditable="true">R$ 3.300,00</span></div>
+            <div class="kpi-card"><span class="kpi-label">Despesas Realizadas</span><span class="kpi-value" style="color:#ef4444;" contenteditable="true">R$ 3.296,00</span></div>
+            <div class="kpi-card"><span class="kpi-label">Contas a Pagar</span><span class="kpi-value" style="color:#b45309;" contenteditable="true">R$ 0</span></div>
+            <div class="kpi-card"><span class="kpi-label">Resultado Final</span><span class="kpi-value" style="color:#16a34a;" contenteditable="true">R$ 4,00</span></div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 30px; margin-top: 10px;">
+            <div style="background: #001f3f; color: white; padding: 30px; border-radius: 8px; display: flex; flex-direction: column; justify-content: center;">
+                <h3 style="color:#d4af37; margin-bottom: 12px;">Parecer da Tesouraria</h3>
+                <p contenteditable="true" style="color:#fdf5e6; font-size: 15px; line-height: 1.6; margin: 0;">
+                    A confraternização em homenagem ao Dia dos Pais contou com a adesão de 66 inscritos, gerando uma receita total de R$ 3.300,00. Os custos com insumos e infraestrutura totalizaram R$ 3.296,00. O balanço final apresenta um lucro de R$4,00.
+                </p>
+            </div>
+            <div style="border: 1px solid #e2e8f0; padding: 25px; border-radius: 8px; display: flex; flex-direction: column; justify-content: center;">
+                <h3 style="margin-bottom: 15px; font-size: 18px;">Métricas de Adesão</h3>
+                <ul style="list-style: none; padding: 0; font-size: 15px; margin: 0;">
+                    <li style="margin-bottom: 12px;">👥 <strong>Total de Inscrições:</strong> 66 Irmãos/Convidados</li>
+                    <li style="margin-bottom: 12px;">🎟️ <strong>Valor Individual:</strong> R$ 50,00</li>
+                </ul>
+            </div>
+        </div>
+       
+    </div>
+
+    <div class="slide-container">
+        <h2 class="slide-title">Entradas e Despesas Efetuadas</h2>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Descrição do Lançamento / Item</th>
+                        <th>Tipo</th>
+                        <th>Qtd / Detalhe</th>
+                        <th>Status</th>
+                        <th>Valor Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Inscrições para o Evento (Dia dos Pais)</td>
+                        <td class="tipo-entrada">Entrada</td>
+                        <td>66 Adesões (R$ 50,00 un)</td>
+                        <td><span class="status-pago">Recebido</span></td>
+                        <td contenteditable="true" style="font-weight: bold;">R$ 3.300,00</td>
+                    </tr>
+                    <tr>
+                        <td>Compra de Proteínas Variadas (Carnes e Acompanhamentos)</td>
+                        <td class="tipo-saida">Saída</td>
+                        <td>Insumos Refeição</td>
+                        <td><span class="status-pago">Pago</span></td>
+                        <td contenteditable="true">R$ 1.621,00</td>
+                    </tr>
+                    <tr>
+                        <td>Compra de Verduras, Vegetais e Temperos</td>
+                        <td class="tipo-saida">Saída</td>
+                        <td>Insumos Refeição</td>
+                        <td><span class="status-pago">Pago</span></td>
+                        <td contenteditable="true">R$ 65,00</td>
+                    </tr>
+                    <tr>
+                        <td>Compra dos Bolos</td>
+                        <td class="tipo-saida">Saída</td>
+                        <td>Insumos Refeição</td>
+                        <td><span class="status-pago">Pago</span></td>
+                        <td contenteditable="true">R$ 260,00</td>
+                    </tr>
+                    <tr>
+                        <td>Pagamentos de Serviços - Banda</td>
+                        <td class="tipo-saida">Saída</td>
+                        <td>Serviços</td>
+                        <td><span class="status-pago">Pago</span></td>
+                        <td contenteditable="true">R$ 700,00</td>
+                    </tr>
+                    <tr>
+                        <td>Pagamentos de Serviços - Churrasqueiro</td>
+                        <td class="tipo-saida">Saída</td>
+                        <td>Serviços</td>
+                        <td><span class="status-pago">Pago</span></td>
+                        <td contenteditable="true">R$ 300,00</td>
+                    </tr>
+                    <tr>
+                        <td>Pagamentos de Serviços - Bernardete</td>
+                        <td class="tipo-saida">Saída</td>
+                        <td>Serviços</td>
+                        <td><span class="status-pago">Pago</span></td>
+                        <td contenteditable="true">R$ 200,00</td>
+                    </tr>
+                    <tr>
+                        <td>Pagamentos de Serviços - Ajudante</td>
+                        <td class="tipo-saida">Saída</td>
+                        <td>Serviços</td>
+                        <td><span class="status-pago">Pago</span></td>
+                        <td contenteditable="true">R$ 150,00</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div style="text-align: right; font-size: 14px; color: #64748b;">
+            * Subtotal de Saídas já compensadas: <strong>R$ 3.296,00</strong>
+        </div>
+    </div>
+
+
+    <div class="slide-container dark-slide" style="text-align: center; justify-content: center;">
+        <h1 contenteditable="true" style="color: #d4af37; font-size: 70px;">T∴F∴A∴</h1>
+        <div style="width: 100px; height: 3px; background: #d4af37; margin: 30px auto;"></div>
+        <p contenteditable="true" style="font-size: 24px; color: #ffffff !important; font-weight: bold;">Tesoureiro - Rodrigo Garcia Rebouças</p>
+        <p contenteditable="true" style="font-size: 16px; opacity: 0.9; margin-top: 40px; max-width: 800px; margin-left: auto; margin-right: auto; color: #ffffff !important;">
+            Gestão Financeira Transparente | Pela União de Nossos Corações
+        </p>
+        <p style="margin-top: 50px; font-weight: bold; color: #d4af37 !important;">Loja Jerônimo Rosado 1994 • Mossoró-RN</p>
+    </div>
+
+</body>
+</html>
