@@ -4,6 +4,7 @@ Módulo de Configuração do Banco de Dados
 Sistema Financeiro - Loja Jerônimo Rosado 1994
 """
 import sqlite3
+import hashlib
 import pandas as pd
 from datetime import datetime, date
 import psycopg2
@@ -28,6 +29,12 @@ except ImportError:
 # ==========================================
 # FUNÇÕES DO BANCO DE DADOS
 # ==========================================
+
+SENHA_INICIAL_OBREIRO = 'Mudar@123'
+
+def hash_senha_obreiro(senha):
+    """Hash SHA-256 da senha do obreiro (auto atendimento)"""
+    return hashlib.sha256(senha.encode('utf-8')).hexdigest()
 
 def get_connection():
     """Retorna conexão com o banco de dados configurado"""
@@ -80,18 +87,36 @@ def init_db():
             )
         """)
     
+    # Colunas do auto atendimento (senha do obreiro)
+    if DB_TYPE == 'postgresql':
+        cursor.execute("ALTER TABLE obreiros ADD COLUMN IF NOT EXISTS senha TEXT")
+        cursor.execute("ALTER TABLE obreiros ADD COLUMN IF NOT EXISTS senha_alterada INTEGER DEFAULT 0")
+        cursor.execute("UPDATE obreiros SET senha = %s WHERE senha IS NULL",
+                       (hash_senha_obreiro(SENHA_INICIAL_OBREIRO),))
+    else:
+        try:
+            cursor.execute("ALTER TABLE obreiros ADD COLUMN senha TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute("ALTER TABLE obreiros ADD COLUMN senha_alterada INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        cursor.execute("UPDATE obreiros SET senha = ? WHERE senha IS NULL",
+                       (hash_senha_obreiro(SENHA_INICIAL_OBREIRO),))
+
     # Adicionar colunas que podem não existir em tabelas antigas (apenas para SQLite)
     if DB_TYPE == 'sqlite':
         try:
             cursor.execute("ALTER TABLE obreiros ADD COLUMN data_nascimento TEXT")
         except sqlite3.OperationalError:
             pass  # A coluna já exists
-        
+
         try:
             cursor.execute("ALTER TABLE obreiros ADD COLUMN email TEXT")
         except sqlite3.OperationalError:
             pass  # A coluna já existe
-        
+
         try:
             cursor.execute("ALTER TABLE obreiros ADD COLUMN telefone TEXT")
         except sqlite3.OperationalError:

@@ -6,7 +6,7 @@ from datetime import datetime, date
 import plotly.express as px
 import plotly.graph_objects as go
 from fpdf import FPDF
-from database_config import DB_PATH, init_db, buscar_dados, executar_comando, executar_lote, formatar_moeda, formatar_data, get_connection
+from database_config import DB_PATH, init_db, buscar_dados, executar_comando, executar_lote, formatar_moeda, formatar_data, get_connection, hash_senha_obreiro
 
 # ==========================================
 # FUNÇÃO PARA GERAR RELATÓRIO DE EVENTO
@@ -202,8 +202,8 @@ def verificar_login(email, senha):
     else:
         return None, "Usuário não encontrado."
 
-# Se não estiver logado, mostrar tela de login
-if 'usuario_logado' not in st.session_state or not st.session_state['usuario_logado']:
+# Se não estiver logado nem em modo obreiro, mostrar tela de login
+if not st.session_state.get('usuario_logado') and not st.session_state.get('modo_obreiro'):
     # CSS personalizado para login
     st.markdown("""
         <style>
@@ -308,7 +308,14 @@ if 'usuario_logado' not in st.session_state or not st.session_state['usuario_log
                 st.error(erro)
         else:
             st.error("Preencha todos os campos.")
-    
+
+    st.markdown("---")
+    st.markdown("### 💳 Área do Obreiro")
+    st.caption("Consulte suas mensalidades e pague via PIX — sem precisar de senha.")
+    if st.button("📱 Acessar Auto Atendimento", use_container_width=True):
+        st.session_state['modo_obreiro'] = True
+        st.rerun()
+
     st.markdown("---")
     st.markdown("""
         <div style="text-align: center; color: #64748b; margin-top: 20px;">
@@ -498,6 +505,287 @@ def gerar_ficha_pdf(row_obreiro, ano_alvo="2026"):
     pdf.cell(0, 6, "T.F.A.", ln=True, align='C')
     
     return pdf.output(dest='S').encode('latin-1')
+
+# ==========================================
+# AUTO ATENDIMENTO DO OBREIRO (PIX)
+# ==========================================
+PIX_CHAVE = "08378101000102"  # CNPJ da Loja
+PIX_NOME_RECEBEDOR = "LOJA JERONIMO ROSADO 1994"  # max 25 caracteres
+PIX_CIDADE = "MOSSORO"  # max 15 caracteres
+
+def _pix_crc16(payload):
+    """CRC16-CCITT (0xFFFF) exigido pelo BR Code/EMV"""
+    crc = 0xFFFF
+    for byte in payload.encode('utf-8'):
+        crc ^= byte << 8
+        for _ in range(8):
+            if crc & 0x8000:
+                crc = ((crc << 1) ^ 0x1021) & 0xFFFF
+            else:
+                crc = (crc << 1) & 0xFFFF
+    return crc
+
+def gerar_pix_copia_cola(valor=None, txid="***"):
+    """Gera payload PIX copia-e-cola no padrão BR Code (EMV)"""
+    def campo(cid, conteudo):
+        return f"{cid}{len(conteudo):02d}{conteudo}"
+    conta = campo("00", "br.gov.bcb.pix") + campo("01", PIX_CHAVE)
+    payload = campo("00", "01") + campo("26", conta) + campo("52", "0000") + campo("53", "986")
+    if valor:
+        payload += campo("54", f"{valor:.2f}")
+    payload += campo("58", "BR")
+    payload += campo("59", PIX_NOME_RECEBEDOR[:25])
+    payload += campo("60", PIX_CIDADE[:15])
+    payload += campo("62", campo("05", txid[:25]))
+    payload += "6304"
+    return payload + f"{_pix_crc16(payload):04X}"
+
+if st.session_state.get('modo_obreiro') and not st.session_state.get('usuario_logado'):
+    st.title("💳 Auto Atendimento do Obreiro")
+    st.markdown("Consulte suas mensalidades, pague via PIX e baixe sua ficha financeira.")
+
+    if st.button("⬅️ Voltar para a tela inicial"):
+        st.session_state['modo_obreiro'] = False
+        for k in ['obreiro_id', 'obreiro_trocar_senha', 'obreiro_cands']:
+            st.session_state.pop(k, None)
+        st.rerun()
+    st.markdown("---")
+
+    MESES_AA = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+                "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+    meses_en_pt = {
+        'January': 'Janeiro', 'February': 'Fevereiro', 'March': 'Março',
+        'April': 'Abril', 'May': 'Maio', 'June': 'Junho',
+        'July': 'Julho', 'August': 'Agosto', 'September': 'Setembro',
+        'October': 'Outubro', 'November': 'Novembro', 'December': 'Dezembro'
+    }
+    ano_atual = str(date.today().year)
+
+    def _cat_key_ob(cat):
+        c = str(cat)
+        if 'Mensalidade' in c: return 'Mensalidade Loja'
+        if 'PAF' in c or 'Funeral' in c: return 'Auxilio Funeral (PAF)'
+        if 'Federal' in c: return 'Anuidade GOB Federal'
+        if 'RN' in c: return 'Anuidade GOB RN'
+        if 'Feminina' in c: return 'Fraternidade Feminina'
+        return c
+
+    # ---------- LOGIN DO OBREIRO (CIM + SENHA) ----------
+    if 'obreiro_id' not in st.session_state:
+        # Caso o CIM tenha mais de um cadastro, obreiro escolhe o nome
+        if 'obreiro_cands' in st.session_state:
+            st.info("Seu CIM possui mais de um cadastro. Selecione seu nome:")
+            nome_cand = st.selectbox("Nome:", list(st.session_state['obreiro_cands'].keys()))
+            if st.button("Confirmar identidade", use_container_width=True):
+                escolha = st.session_state['obreiro_cands'][nome_cand]
+                st.session_state['obreiro_id'] = escolha['id']
+                st.session_state['obreiro_trocar_senha'] = escolha['senha_alterada'] == 0
+                del st.session_state['obreiro_cands']
+                st.rerun()
+            st.stop()
+
+        with st.form("login_obreiro"):
+            cim_in = st.text_input("CIM:", placeholder="Somente números")
+            senha_in = st.text_input("Senha:", type="password")
+            entrar = st.form_submit_button("Entrar", use_container_width=True)
+        st.caption("Primeiro acesso? Use a senha inicial fornecida pela tesouraria.")
+
+        if entrar:
+            if not cim_in or not senha_in:
+                st.error("Informe CIM e senha.")
+            else:
+                df_login = buscar_dados(
+                    "SELECT id, nome, senha, senha_alterada FROM obreiros WHERE cim = %s",
+                    (cim_in.strip(),))
+                if df_login.empty:
+                    st.error("CIM não encontrado.")
+                else:
+                    hash_in = hash_senha_obreiro(senha_in)
+                    candidatos = df_login[df_login['senha'].fillna('') == hash_in]
+                    if candidatos.empty:
+                        st.error("Senha incorreta.")
+                    elif len(candidatos) == 1:
+                        r = candidatos.iloc[0]
+                        st.session_state['obreiro_id'] = int(r['id'])
+                        st.session_state['obreiro_trocar_senha'] = int(r['senha_alterada'] or 0) == 0
+                        st.rerun()
+                    else:
+                        st.session_state['obreiro_cands'] = {
+                            r['nome']: {'id': int(r['id']), 'senha_alterada': int(r['senha_alterada'] or 0)}
+                            for _, r in candidatos.iterrows()
+                        }
+                        st.rerun()
+        st.stop()
+
+    # ---------- TROCA OBRIGATÓRIA DE SENHA ----------
+    if st.session_state.get('obreiro_trocar_senha'):
+        st.warning("🔐 Primeiro acesso: crie uma nova senha para continuar.")
+        with st.form("troca_senha_obreiro"):
+            nova1 = st.text_input("Nova senha:", type="password")
+            nova2 = st.text_input("Confirme a nova senha:", type="password")
+            trocar = st.form_submit_button("Salvar nova senha", use_container_width=True)
+        if trocar:
+            if len(nova1) < 6:
+                st.error("A senha deve ter pelo menos 6 caracteres.")
+            elif nova1 != nova2:
+                st.error("As senhas não conferem.")
+            elif nova1 == 'Mudar@123':
+                st.error("Escolha uma senha diferente da inicial.")
+            else:
+                if executar_comando(
+                        "UPDATE obreiros SET senha = %s, senha_alterada = 1 WHERE id = %s",
+                        (hash_senha_obreiro(nova1), st.session_state['obreiro_id'])):
+                    st.session_state['obreiro_trocar_senha'] = False
+                    st.session_state['aa_sucesso'] = "Senha alterada com sucesso!"
+                    st.rerun()
+        st.stop()
+
+    # ---------- ÁREA LOGADA DO OBREIRO ----------
+    row_ob = buscar_dados("SELECT * FROM obreiros WHERE id = %s",
+                          (st.session_state['obreiro_id'],)).iloc[0]
+    nome_sel = row_ob['nome']
+    st.success(f"Bem-vindo, {nome_sel}!")
+
+    msg_ok = st.session_state.pop('aa_sucesso', None)
+    if msg_ok:
+        st.success(msg_ok)
+        st.balloons()
+
+    if st.button("🚪 Sair"):
+        for k in ['obreiro_id', 'obreiro_trocar_senha']:
+            st.session_state.pop(k, None)
+        st.rerun()
+
+    # Situação das mensalidades e taxas do ano corrente
+    df_pag = buscar_dados("""
+        SELECT mes_competencia, categoria, valor FROM transacoes
+        WHERE obreiro_id = %s AND ano_competencia = %s AND tipo = 'Entrada'
+    """, (int(row_ob['id']), ano_atual))
+
+    pagos = {}  # (mes, cat_key) -> total pago
+    for _, t in df_pag.iterrows():
+        mes_c = t['mes_competencia']
+        if mes_c in meses_en_pt:
+            mes_c = meses_en_pt[mes_c]
+        chave = (mes_c, _cat_key_ob(t['categoria']))
+        pagos[chave] = pagos.get(chave, 0.0) + float(t['valor'])
+
+    valor_mensal = float(row_ob['valor_mensalidade'])
+    isento = int(row_ob['isento'] or 0) == 1
+
+    linhas_ficha = []
+    for m in MESES_AA:
+        pago = pagos.get((m, 'Mensalidade Loja'), 0.0)
+        quitado = valor_mensal > 0 and pago >= valor_mensal
+        linhas_ficha.append({
+            'Mês': m,
+            'Mensalidade': formatar_moeda(valor_mensal),
+            'Pago': formatar_moeda(pago) if pago > 0 else '-',
+            'Situação': 'Quitado' if quitado else 'Em aberto'
+        })
+
+    st.write(f"### 📋 Suas Mensalidades — {ano_atual}")
+    st.dataframe(pd.DataFrame(linhas_ficha), use_container_width=True)
+
+    if isento:
+        st.info("Você está isento de mensalidades.")
+    else:
+        st.markdown("---")
+        st.write("### 💸 Débitos Disponíveis para Pagamento")
+        st.caption("Marque os itens que deseja pagar. O PIX será gerado com o total selecionado.")
+
+        TAXAS_PADRAO = [
+            ("Auxilio Funeral (PAF)", 10.84),
+            ("Anuidade GOB Federal", 17.50),
+            ("Anuidade GOB RN", 28.17),
+        ]
+
+        itens = []
+        for m in MESES_AA:
+            if pagos.get((m, 'Mensalidade Loja'), 0.0) < valor_mensal:
+                itens.append({'Pagar': False, 'Mês': m, 'Item': 'Mensalidade Loja', 'Valor': valor_mensal})
+            for cat_nome, cat_valor in TAXAS_PADRAO:
+                if (m, cat_nome) not in pagos:
+                    itens.append({'Pagar': False, 'Mês': m, 'Item': cat_nome, 'Valor': cat_valor})
+
+        if not itens:
+            st.success("Parabéns! Todos os seus débitos do ano estão quitados.")
+        else:
+            df_itens = pd.DataFrame(itens)
+            selecao = st.data_editor(
+                df_itens,
+                hide_index=True,
+                use_container_width=True,
+                column_config={
+                    "Pagar": st.column_config.CheckboxColumn("Pagar", default=False),
+                    "Valor": st.column_config.NumberColumn("Valor", format="R$ %.2f"),
+                },
+                disabled=["Mês", "Item", "Valor"],
+                key="editor_debitos"
+            )
+            selecionados = selecao[selecao['Pagar']]
+            total_pix = float(selecionados['Valor'].sum())
+
+            if total_pix > 0:
+                txid = f"CIM{row_ob['cim']}{int(datetime.now().timestamp())}"
+                payload_pix = gerar_pix_copia_cola(total_pix, txid)
+
+                st.metric("Total a pagar", formatar_moeda(total_pix))
+                st.write(f"**Chave PIX (CNPJ):** {PIX_CHAVE}")
+                st.write("**PIX Copia e Cola:**")
+                st.code(payload_pix, language=None)
+
+                try:
+                    import qrcode
+                    from io import BytesIO
+                    img_qr = qrcode.make(payload_pix)
+                    buf_qr = BytesIO()
+                    img_qr.save(buf_qr, format='PNG')
+                    st.image(buf_qr.getvalue(), width=220)
+                except ImportError:
+                    st.caption("QR Code indisponível — use o código copia e cola acima.")
+
+                st.warning("Após pagar no aplicativo do seu banco, clique abaixo para registrar o pagamento na sua ficha.")
+                if st.button("✅ Confirmar Pagamento", type="primary", use_container_width=True):
+                    # Re-verificar itens ainda em aberto para evitar lançamento duplicado
+                    df_check = buscar_dados("""
+                        SELECT mes_competencia, categoria FROM transacoes
+                        WHERE obreiro_id = %s AND ano_competencia = %s AND tipo = 'Entrada'
+                    """, (int(row_ob['id']), ano_atual))
+                    ja_pagos = set()
+                    for _, t in df_check.iterrows():
+                        mc = t['mes_competencia']
+                        ja_pagos.add((meses_en_pt.get(mc, mc), _cat_key_ob(t['categoria'])))
+
+                    hoje = date.today().strftime('%Y-%m-%d')
+                    comandos = []
+                    for _, item in selecionados.iterrows():
+                        if (item['Mês'], item['Item']) in ja_pagos:
+                            continue
+                        comandos.append((
+                            "INSERT INTO transacoes (data, tipo, categoria, descricao, valor, obreiro_id, mes_competencia, ano_competencia, tipo_caixa) VALUES (%s, 'Entrada', %s, %s, %s, %s, %s, %s, 'Bancário')",
+                            (hoje, item['Item'],
+                             f"Entrada/{nome_sel}/{item['Item']}/{float(item['Valor']):.2f} (PIX Auto Atendimento)",
+                             float(item['Valor']), int(row_ob['id']), item['Mês'], ano_atual)
+                        ))
+
+                    if not comandos:
+                        st.error("Esses itens já constam como pagos.")
+                    elif executar_lote(comandos):
+                        st.session_state['aa_sucesso'] = f"Pagamento registrado: {len(comandos)} item(ns) — {formatar_moeda(sum(c[1][3] for c in comandos))}"
+                        st.rerun()
+
+    st.markdown("---")
+    st.write("### 📄 Minha Ficha Financeira")
+    pdf_bytes = gerar_ficha_pdf(row_ob, ano_atual)
+    st.download_button(
+        label="📥 Baixar Ficha Anual (PDF)",
+        data=pdf_bytes,
+        file_name=f"Ficha_{nome_sel.replace(' ', '_')}_{ano_atual}.pdf",
+        mime="application/pdf",
+        use_container_width=True
+    )
+    st.stop()
 
 # ==========================================
 # INTERFACE E NAVEGAÇÃO DO STREAMLIT
