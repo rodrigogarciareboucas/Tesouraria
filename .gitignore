@@ -55,6 +55,8 @@ Thumbs.db
 
 # Arquivos de backup
 BKP/
+backup/
+*.sql
 dist/
 
 # Arquivos de dados sensíveis
