@@ -558,13 +558,24 @@ ANOS = ["2026", "2027", "2028"]
 # ==========================================
 if modulo == "📊 Visão Geral (Dashboard)":
     st.subheader("📊 Painel Financeiro Consolidado")
-    
+
+    # Data fim padrão: a maior data lançada (para incluir lançamentos futuros)
+    df_max_data = buscar_dados("SELECT MAX(data) FROM transacoes")
+    data_fim_padrao = date.today()
+    if not df_max_data.empty and df_max_data.iloc[0, 0]:
+        try:
+            d_max = datetime.strptime(str(df_max_data.iloc[0, 0])[:10], '%Y-%m-%d').date()
+            if d_max > data_fim_padrao:
+                data_fim_padrao = d_max
+        except ValueError:
+            pass
+
     # Filtros de período e tipo de caixa
     col_filtro1, col_filtro2, col_filtro3 = st.columns(3)
     with col_filtro1:
         data_inicio = st.date_input("Data Início", value=date(2026, 1, 1))
     with col_filtro2:
-        data_fim = st.date_input("Data Fim", value=date.today())
+        data_fim = st.date_input("Data Fim", value=data_fim_padrao)
     with col_filtro3:
         tipo_caixa_dash = st.selectbox("Tipo de Caixa:", ["Todos", "Bancário", "Dinheiro", "Eventos"])
     
@@ -930,12 +941,23 @@ elif modulo == "📈 Relatório Detalhado":
         </style>
     """, unsafe_allow_html=True)
     
+    # Data fim padrão: a maior data lançada (para incluir lançamentos futuros)
+    df_max_rel = buscar_dados("SELECT MAX(data) FROM transacoes")
+    data_fim_rel_padrao = date.today()
+    if not df_max_rel.empty and df_max_rel.iloc[0, 0]:
+        try:
+            d_max_rel = datetime.strptime(str(df_max_rel.iloc[0, 0])[:10], '%Y-%m-%d').date()
+            if d_max_rel > data_fim_rel_padrao:
+                data_fim_rel_padrao = d_max_rel
+        except ValueError:
+            pass
+
     # Seleção de período
     col_data1, col_data2 = st.columns(2)
     with col_data1:
         data_inicio_rel = st.date_input("Data Início", value=date(2026, 1, 1))
     with col_data2:
-        data_fim_rel = st.date_input("Data Fim", value=date.today())
+        data_fim_rel = st.date_input("Data Fim", value=data_fim_rel_padrao)
     
     # Filtro por tipo de caixa
     tipo_caixa_rel = st.selectbox("Tipo de Caixa:", ["Todos", "Bancário", "Dinheiro", "Eventos"])
