@@ -34,9 +34,17 @@ def get_connection():
     if DB_TYPE == 'postgresql':
         if not POSTGRES_CONFIG:
             raise ValueError("Configuração PostgreSQL não encontrada. Verifique config_postgres.py")
-        # Adicionar SSL para Supabase
-        import os
-        sslmode = os.getenv('POSTGRES_SSLMODE', 'prefer')
+        # Adicionar SSL para Supabase - tentar usar st.secrets primeiro
+        try:
+            import streamlit as st
+            if hasattr(st, 'secrets'):
+                sslmode = st.secrets.get('POSTGRES_SSLMODE', 'require')
+            else:
+                import os
+                sslmode = os.getenv('POSTGRES_SSLMODE', 'require')
+        except ImportError:
+            import os
+            sslmode = os.getenv('POSTGRES_SSLMODE', 'require')
         return psycopg2.connect(**POSTGRES_CONFIG, sslmode=sslmode)
     else:
         return sqlite3.connect(DB_PATH)
