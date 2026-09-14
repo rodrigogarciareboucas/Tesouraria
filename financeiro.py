@@ -6,7 +6,169 @@ from datetime import datetime, date
 import plotly.express as px
 import plotly.graph_objects as go
 from fpdf import FPDF
-from database_config import DB_PATH, init_db, buscar_dados, executar_comando, formatar_moeda, formatar_data
+from database_config import DB_PATH, init_db, buscar_dados, executar_comando, formatar_moeda, formatar_data, get_connection
+
+# ==========================================
+# FUNÇÃO PARA GERAR RELATÓRIO DE EVENTO
+# ==========================================
+def gerar_relatorio_evento(evento_id, evento_nome, df_transacoes, total_entradas, total_saidas, saldo):
+    """Gera relatório HTML de apuração financeira do evento seguindo o layout do dia_dos_pais.html"""
+    
+    # Buscar detalhes do evento
+    df_evento = buscar_dados("SELECT * FROM eventos WHERE id = %s", (evento_id,))
+    if not df_evento.empty:
+        evento = df_evento.iloc[0]
+        evento_titulo = evento['titulo']
+        evento_data = formatar_data(evento['data_evento'])
+    else:
+        evento_titulo = evento_nome.split(' - ')[0]
+        evento_data = datetime.now().strftime('%d/%m/%Y')
+    
+    # Calcular métricas
+    contas_pagar = 0  # Pode ser calculado se houver status de pendência
+    
+    # Gerar linhas da tabela
+    linhas_tabela = ""
+    for _, row in df_transacoes.iterrows():
+        tipo_class = "tipo-entrada" if row['tipo'] == 'Entrada' else "tipo-saida"
+        status_class = "status-pago"  # Pode ser ajustado se houver status
+        status_text = "Recebido" if row['tipo'] == 'Entrada' else "Pago"
+        
+        linhas_tabela += f"""
+                    <tr>
+                        <td>{row['descricao']}</td>
+                        <td class="{tipo_class}">{row['tipo']}</td>
+                        <td>{row['categoria']}</td>
+                        <td><span class="{status_class}">{status_text}</span></td>
+                        <td style="font-weight: bold;">{formatar_moeda(row['valor'])}</td>
+                    </tr>
+        """
+    
+    # Template HTML
+    html_template = f"""<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apuração Financeira - {evento_titulo}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        * {{ box-sizing: border-box; }}
+        body {{
+            background-color: #0f172a;
+            display: grid; gap: 40px;
+            grid-template-columns: 1fr;
+            margin: 0; min-height: 100vh;
+            padding: 40px 0; place-items: center;
+        }}
+        .slide-container {{
+            width: 1280px; height: 720px;
+            background-color: #ffffff;
+            padding: 50px 60px;
+            display: flex; flex-direction: column;
+            position: relative; overflow: hidden;
+            font-family: 'Lato', sans-serif;
+            border-radius: 4px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }}
+        .slide-container::before {{ content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; background-color: #fff; }}
+        .dark-slide.slide-container::before {{ background: linear-gradient(135deg, #001f3f 0%, #001122 100%); }}
+        .slide-container > * {{ position: relative; z-index: 1; }}
+        h1, h2, h3 {{ color: #001f3f; font-weight: 700; font-family: 'Poppins', sans-serif; margin: 0; }}
+        .dark-slide h1, .dark-slide h2, .dark-slide h3 {{ color: #fdf5e6 !important; }}
+        .slide-title {{ font-size: 32px; font-weight: 700; color: #001f3f; margin-bottom: 25px; border-bottom: 3px solid #d4af37; padding-bottom: 8px; width: 100%; text-align: left; }}
+        .dark-slide .slide-title {{ color: #d4af37 !important; border-bottom-color: #fdf5e6; }}
+        .table-wrapper {{ width: 100%; flex-grow: 1; overflow: hidden; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 14px; background: white; }}
+        th {{ background-color: #001f3f; color: #d4af37; padding: 12px 15px; text-align: left; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; }}
+        td {{ padding: 10px 15px; border-bottom: 1px solid #f1f5f9; color: #334155; }}
+        tr:nth-child(even) {{ background-color: #f8fafc; }}
+        .status-pago {{ color: #15803d; font-weight: 700; background: #dcfce7; padding: 4px 8px; border-radius: 4px; font-size: 11px; text-transform: uppercase; }}
+        .status-pendente {{ color: #b45309; font-weight: 700; background: #fef3c7; padding: 4px 8px; border-radius: 4px; font-size: 11px; text-transform: uppercase; }}
+        .tipo-entrada {{ color: #16a34a; font-weight: bold; }}
+        .tipo-saida {{ color: #ef4444; font-weight: bold; }}
+        .kpi-row {{ display: flex; gap: 20px; margin-bottom: 25px; }}
+        .kpi-card {{ background: #f8fafc; padding: 18px; border-radius: 8px; flex: 1; border-top: 4px solid #d4af37; text-align: center; }}
+        .kpi-value {{ font-size: 30px; font-weight: 700; color: #001f3f; display: block; }}
+        .kpi-label {{ font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; }}
+        @media print {{ body {{ padding: 0; background: white; }} .slide-container {{ box-shadow: none; border: none; page-break-after: always; }} }}
+    </style>
+</head>
+<body>
+    <div class="slide-container dark-slide">
+        <div style="text-align: center; margin: auto;">
+            <img src="portal/img/logo.png" alt="Logo" style="width: 160px; height: 160px; border-radius: 50%; border: 4px solid #d4af37; margin-bottom: 25px;">
+            <h1 style="font-size: 46px; line-height: 1.2;">Prestação de Contas Extraordinária<br><span style="color:#d4af37;">{evento_titulo}</span></h1>
+            <p style="margin-top: 50px; font-weight: bold; color: #d4af37 !important;">A.R.L.S. JERÔNIMO ROSADO Nº 1994</p>
+            <div style="width: 80px; height: 4px; background: #d4af37; margin: 30px auto;"></div>
+            <p style="opacity: 0.7; font-style: italic;">Mossoró - RN • {evento_data}</p>
+        </div>
+    </div>
+
+    <div class="slide-container">
+        <h2 class="slide-title">Resumo Financeiro do Evento</h2>
+        <div class="kpi-row">
+            <div class="kpi-card"><span class="kpi-label">Receita Arrecadada</span><span class="kpi-value" style="color:#16a34a;">{formatar_moeda(total_entradas)}</span></div>
+            <div class="kpi-card"><span class="kpi-label">Despesas Realizadas</span><span class="kpi-value" style="color:#ef4444;">{formatar_moeda(total_saidas)}</span></div>
+            <div class="kpi-card"><span class="kpi-label">Contas a Pagar</span><span class="kpi-value" style="color:#b45309;">{formatar_moeda(contas_pagar)}</span></div>
+            <div class="kpi-card"><span class="kpi-label">Resultado Final</span><span class="kpi-value" style="color:#16a34a;">{formatar_moeda(saldo)}</span></div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 30px; margin-top: 10px;">
+            <div style="background: #001f3f; color: white; padding: 30px; border-radius: 8px; display: flex; flex-direction: column; justify-content: center;">
+                <h3 style="color:#d4af37; margin-bottom: 12px;">Parecer da Tesouraria</h3>
+                <p style="color:#fdf5e6; font-size: 15px; line-height: 1.6; margin: 0;">
+                    O evento "{evento_titulo}" realizado em {evento_data} gerou uma receita total de {formatar_moeda(total_entradas)}. As despesas realizadas totalizaram {formatar_moeda(total_saidas)}. O balanço final apresenta um {'lucro' if saldo >= 0 else 'prejuízo'} de {formatar_moeda(abs(saldo))}.
+                </p>
+            </div>
+            <div style="border: 1px solid #e2e8f0; padding: 25px; border-radius: 8px; display: flex; flex-direction: column; justify-content: center;">
+                <h3 style="margin-bottom: 15px; font-size: 18px;">Métricas do Evento</h3>
+                <ul style="list-style: none; padding: 0; font-size: 15px; margin: 0;">
+                    <li style="margin-bottom: 12px;">📊 <strong>Total de Lançamentos:</strong> {len(df_transacoes)}</li>
+                    <li style="margin-bottom: 12px;">💰 <strong>Média por Lançamento:</strong> {formatar_moeda(total_entradas / len(df_transacoes) if len(df_transacoes) > 0 else 0)}</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-container">
+        <h2 class="slide-title">Entradas e Despesas Efetuadas</h2>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Descrição do Lançamento / Item</th>
+                        <th>Tipo</th>
+                        <th>Qtd / Detalhe</th>
+                        <th>Status</th>
+                        <th>Valor Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {linhas_tabela}
+                </tbody>
+            </table>
+        </div>
+        <div style="text-align: right; font-size: 14px; color: #64748b;">
+            * Subtotal de Saídas já compensadas: <strong>{formatar_moeda(total_saidas)}</strong>
+        </div>
+    </div>
+
+    <div class="slide-container dark-slide" style="text-align: center; justify-content: center;">
+        <h1 style="color: #d4af37; font-size: 70px;">T∴F∴A∴</h1>
+        <div style="width: 100px; height: 3px; background: #d4af37; margin: 30px auto;"></div>
+        <p style="font-size: 24px; color: #ffffff !important; font-weight: bold;">Tesoureiro - Rodrigo Garcia Rebouças</p>
+        <p style="font-size: 16px; opacity: 0.9; margin-top: 40px; max-width: 800px; margin-left: auto; margin-right: auto; color: #ffffff !important;">
+            Gestão Financeira Transparente | Pela União de Nossos Corações
+        </p>
+        <p style="margin-top: 50px; font-weight: bold; color: #d4af37 !important;">Loja Jerônimo Rosado 1994 • Mossoró-RN</p>
+    </div>
+</body>
+</html>"""
+    
+    return html_template
 
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA E DESIGN MAÇÔNICO
@@ -19,9 +181,9 @@ st.set_page_config(page_title="Tesouraria - Jeronimo Rosado 1994", page_icon="�
 
 # Função para verificar login
 def verificar_login(email, senha):
-    conn = sqlite3.connect(r'C:\Users\Rodrigo  Garcia\Desktop\Maconaria\financas_loja.db')
+    conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, nome, email, senha, nivel_acesso, ativo FROM usuarios WHERE email = ?", (email,))
+    cursor.execute("SELECT id, nome, email, senha, nivel_acesso, ativo FROM usuarios WHERE email = %s", (email,))
     usuario = cursor.fetchone()
     conn.close()
     
@@ -220,7 +382,7 @@ def gerar_ficha_pdf(row_obreiro, ano_alvo="2026"):
     df_trans = buscar_dados("""
         SELECT categoria, valor, mes_competencia 
         FROM transacoes 
-        WHERE obreiro_id = ? AND ano_competencia = ? AND tipo = 'Entrada'
+        WHERE obreiro_id = %s AND ano_competencia = %s AND tipo = 'Entrada'
     """, (obreiro_id, ano_alvo))
     
     matriz = {cat: {mes: 0.0 for mes in meses_lista} for cat in categorias_ficha}
@@ -404,21 +566,21 @@ if modulo == "📊 Visão Geral (Dashboard)":
     with col_filtro2:
         data_fim = st.date_input("Data Fim", value=date.today())
     with col_filtro3:
-        tipo_caixa_dash = st.selectbox("Tipo de Caixa:", ["Todos", "Bancário", "Dinheiro"])
+        tipo_caixa_dash = st.selectbox("Tipo de Caixa:", ["Todos", "Bancário", "Dinheiro", "Eventos"])
     
     # Cálculo de Métricas Globais com filtro
     if tipo_caixa_dash == "Todos":
         query_dash = """
             SELECT data, tipo, categoria, descricao, valor, mes_competencia, ano_competencia, tipo_caixa
             FROM transacoes 
-            WHERE data BETWEEN ? AND ?
+            WHERE data BETWEEN %s AND %s
         """
         params_dash = (data_inicio.strftime('%Y-%m-%d'), data_fim.strftime('%Y-%m-%d'))
     else:
         query_dash = """
             SELECT data, tipo, categoria, descricao, valor, mes_competencia, ano_competencia, tipo_caixa
             FROM transacoes 
-            WHERE data BETWEEN ? AND ? AND tipo_caixa = ?
+            WHERE data BETWEEN %s AND %s AND tipo_caixa = %s
         """
         params_dash = (data_inicio.strftime('%Y-%m-%d'), data_fim.strftime('%Y-%m-%d'), tipo_caixa_dash)
     
@@ -547,7 +709,7 @@ elif modulo == "🏷️ Gerenciar Categorias":
         nome_cat = st.text_input("Nome da nova categoria:")
         if st.form_submit_button("Cadastrar Categoria"):
             if nome_cat.strip() != "":
-                resultado = executar_comando("INSERT INTO categorias (nome) VALUES (?)", (nome_cat.strip(),))
+                resultado = executar_comando("INSERT INTO categorias (nome) VALUES (%s)", (nome_cat.strip(),))
                 if resultado:
                     st.success("Categoria cadastrada com sucesso!")
                     st.rerun()
@@ -569,7 +731,7 @@ elif modulo == "🏷️ Gerenciar Categorias":
             cat_para_excluir = st.selectbox("Selecione a categoria para excluir:", df_cats['nome'].tolist())
             if st.button("Confirmar Exclusão", type="secondary"):
                 if cat_para_excluir:
-                    resultado = executar_comando("DELETE FROM categorias WHERE nome = ?", (cat_para_excluir,))
+                    resultado = executar_comando("DELETE FROM categorias WHERE nome = %s", (cat_para_excluir,))
                     if resultado:
                         st.success(f"Categoria '{cat_para_excluir}' excluída com sucesso!")
                         st.rerun()
@@ -582,7 +744,7 @@ elif modulo == "📝 Livro Caixa (Lançar e Editar)":
     st.subheader("Lancamentos no Livro do Caixa")
     
     # Seleção do tipo de caixa
-    tipo_caixa_sel = st.radio("Tipo de Caixa:", ["Bancário", "Dinheiro"], horizontal=True)
+    tipo_caixa_sel = st.radio("Tipo de Caixa:", ["Bancário", "Dinheiro", "Eventos"], horizontal=True)
 
     # Busca categorias do banco
     df_cats = buscar_dados("SELECT nome FROM categorias ORDER BY nome")
@@ -599,7 +761,7 @@ elif modulo == "📝 Livro Caixa (Lançar e Editar)":
             if val > 0:
                 if not desc.strip():
                     desc = f"{tip} - {cat}"
-                resultado = executar_comando("INSERT INTO transacoes (data, tipo, categoria, descricao, valor, mes_competencia, ano_competencia, tipo_caixa) VALUES (?,?,?,?,?,?,?,?)",
+                resultado = executar_comando("INSERT INTO transacoes (data, tipo, categoria, descricao, valor, mes_competencia, ano_competencia, tipo_caixa) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
                                  (dat.strftime('%Y-%m-%d'), tip, cat, desc, val, dat.strftime('%B'), dat.strftime('%Y'), tipo_caixa_sel))
                 if resultado:
                     st.success("Lancado!")
@@ -611,12 +773,12 @@ elif modulo == "📝 Livro Caixa (Lançar e Editar)":
     st.subheader("Historico de Lancamentos Recentes")
     
     # Filtro por tipo de caixa no histórico
-    filtro_caixa_hist = st.selectbox("Filtrar por Tipo de Caixa:", ["Todos", "Bancário", "Dinheiro"], key="filtro_hist_caixa")
+    filtro_caixa_hist = st.selectbox("Filtrar por Tipo de Caixa:", ["Todos", "Bancário", "Dinheiro", "Eventos"], key="filtro_hist_caixa")
     
     if filtro_caixa_hist == "Todos":
         df_lista_trans = buscar_dados("SELECT id, data, tipo, categoria, descricao, valor, tipo_caixa FROM transacoes ORDER BY id DESC")
     else:
-        df_lista_trans = buscar_dados("SELECT id, data, tipo, categoria, descricao, valor, tipo_caixa FROM transacoes WHERE tipo_caixa = ? ORDER BY id DESC", (filtro_caixa_hist,))
+        df_lista_trans = buscar_dados("SELECT id, data, tipo, categoria, descricao, valor, tipo_caixa FROM transacoes WHERE tipo_caixa = %s ORDER BY id DESC", (filtro_caixa_hist,))
     
     if not df_lista_trans.empty:
         df_visualizacao = df_lista_trans.copy()
@@ -639,7 +801,7 @@ elif modulo == "📝 Livro Caixa (Lançar e Editar)":
             id_para_deletar = st.number_input("Digite o ID do lancamento que deseja excluir:", min_value=1, step=1)
             if st.button("Confirmar Exclusao do Lancamento"):
                 if id_para_deletar in df_lista_trans['id'].values:
-                    executar_comando("DELETE FROM transacoes WHERE id = ?", (int(id_para_deletar),))
+                    executar_comando("DELETE FROM transacoes WHERE id = %s", (int(id_para_deletar),))
                     st.success("Lancamento removido com sucesso!")
                     st.rerun()
                 else:
@@ -690,19 +852,19 @@ elif modulo == "🏦 Conciliação Bancária":
 
                             # Insere no Livro Caixa oficial
                             sucesso = executar_comando(
-                                "INSERT INTO transacoes (data, tipo, categoria, descricao, valor, mes_competencia, ano_competencia, id_sicredi, tipo_caixa) VALUES (?,?,?,?,?,?,?,?,?)",
+                                "INSERT INTO transacoes (data, tipo, categoria, descricao, valor, mes_competencia, ano_competencia, id_sicredi, tipo_caixa) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                                 (row['data'], row['tipo'], cat_selecionada, row['descricao_banco'], row['valor'], mes_comp, ano_comp, row['id_sicredi'], 'Bancário')
                             )
                             
                             if sucesso:
                                 # Marca como processado na fila
-                                executar_comando("UPDATE fila_sicredi SET status_conciliacao = 'Conciliado' WHERE id = ?", (row['id'],))
+                                executar_comando("UPDATE fila_sicredi SET status_conciliacao = 'Conciliado' WHERE id = %s", (row['id'],))
                                 st.success("Transação transferida para o Livro Caixa com sucesso!")
                                 st.rerun()
                     
                     with col_btn2:
                         if st.button("Excluir", key=f"btn_exc_{row['id']}", type="secondary", use_container_width=True):
-                            executar_comando("DELETE FROM fila_sicredi WHERE id = ?", (row['id'],))
+                            executar_comando("DELETE FROM fila_sicredi WHERE id = %s", (row['id'],))
                             st.success("Lançamento excluído da fila!")
                             st.rerun()
                             
@@ -776,22 +938,22 @@ elif modulo == "📈 Relatório Detalhado":
         data_fim_rel = st.date_input("Data Fim", value=date.today())
     
     # Filtro por tipo de caixa
-    tipo_caixa_rel = st.selectbox("Tipo de Caixa:", ["Todos", "Bancário", "Dinheiro"])
+    tipo_caixa_rel = st.selectbox("Tipo de Caixa:", ["Todos", "Bancário", "Dinheiro", "Eventos"])
     
     # Buscar dados do período
     if tipo_caixa_rel == "Todos":
         query_rel = """
             SELECT data, tipo, categoria, descricao, valor, mes_competencia, ano_competencia, tipo_caixa
-            FROM transacoes 
-            WHERE data BETWEEN ? AND ?
+            FROM transacoes
+            WHERE data BETWEEN %s AND %s
             ORDER BY data
         """
         params_rel = (data_inicio_rel.strftime('%Y-%m-%d'), data_fim_rel.strftime('%Y-%m-%d'))
     else:
         query_rel = """
             SELECT data, tipo, categoria, descricao, valor, mes_competencia, ano_competencia, tipo_caixa
-            FROM transacoes 
-            WHERE data BETWEEN ? AND ? AND tipo_caixa = ?
+            FROM transacoes
+            WHERE data BETWEEN %s AND %s AND tipo_caixa = %s
             ORDER BY data
         """
         params_rel = (data_inicio_rel.strftime('%Y-%m-%d'), data_fim_rel.strftime('%Y-%m-%d'), tipo_caixa_rel)
@@ -1080,7 +1242,7 @@ elif modulo == "💳 Carteira de Obreiros (Mensalidades)":
                 st.write(f"### {row['nome']}")
                 st.write(f"CIM: {row['cim']} | Grau: {row['grau']}")
                 
-                df_p = buscar_dados("SELECT mes_competencia, categoria, valor FROM transacoes WHERE obreiro_id = ? AND tipo = 'Entrada' ORDER BY id DESC", (row['id'],))
+                df_p = buscar_dados("SELECT mes_competencia, categoria, valor FROM transacoes WHERE obreiro_id = %s AND tipo = 'Entrada' ORDER BY id DESC", (row['id'],))
                 
                 if not df_p.empty:
                     st.dataframe(df_p, use_container_width=True)
@@ -1124,7 +1286,7 @@ elif modulo == "💳 Carteira de Obreiros (Mensalidades)":
                 nome_extra = st.text_input("Nome da Taxa Extra (opcional)", value="", placeholder="Ex: Taxa de Evento, Taxa de Jantar, etc.")
             
             # Verificacao de duplicidade
-            ja_lancado = buscar_dados("SELECT id, categoria FROM transacoes WHERE obreiro_id = ? AND mes_competencia = ? AND ano_competencia = ?", (id_irmao, mes_b, ano_b))
+            ja_lancado = buscar_dados("SELECT id, categoria FROM transacoes WHERE obreiro_id = %s AND mes_competencia = %s AND ano_competencia = %s", (id_irmao, mes_b, ano_b))
             processar = True
             if not ja_lancado.empty:
                 categorias_lancadas = ", ".join(ja_lancado['categoria'].tolist())
@@ -1156,7 +1318,7 @@ elif modulo == "💳 Carteira de Obreiros (Mensalidades)":
                             data_lancamento = date(int(ano_b), mes_num, 1).strftime('%Y-%m-%d')
                             
                             descricao = f'Entrada/{irmao_sel}/{categoria_final}/{val}'
-                            executar_comando("INSERT INTO transacoes (data, tipo, categoria, descricao, valor, obreiro_id, mes_competencia, ano_competencia, tipo_caixa) VALUES (?, 'Entrada', ?, ?, ?, ?, ?, ?, 'Bancário')",
+                            executar_comando("INSERT INTO transacoes (data, tipo, categoria, descricao, valor, obreiro_id, mes_competencia, ano_competencia, tipo_caixa) VALUES (%s, 'Entrada', %s, %s, %s, %s, %s, %s, 'Bancário')",
                                              (data_lancamento, categoria_final, descricao, val, id_irmao, mes_b, ano_b))
                     st.success("Lancamento efetuado com sucesso.")
                     st.rerun()
@@ -1186,14 +1348,14 @@ elif modulo == "💳 Carteira de Obreiros (Mensalidades)":
                 obreiro_nome = row_obreiro['nome']
                 
                 # Buscar a última mensalidade paga - lógica híbrida
-                conn = sqlite3.connect(DB_PATH)
+                conn = get_connection()
                 cursor = conn.cursor()
                 
                 # Tentar primeiro por obreiro_id
                 query_ultima_id = """
                     SELECT MAX(data)
                     FROM transacoes
-                    WHERE obreiro_id = ? 
+                    WHERE obreiro_id = %s
                     AND descricao LIKE '%Mensalidade Loja%'
                 """
                 cursor.execute(query_ultima_id, (obreiro_id,))
@@ -1204,7 +1366,7 @@ elif modulo == "💳 Carteira de Obreiros (Mensalidades)":
                     query_ultima_nome = """
                         SELECT MAX(data)
                         FROM transacoes
-                        WHERE descricao LIKE ? 
+                        WHERE descricao LIKE %s
                         AND descricao LIKE '%Mensalidade Loja%'
                     """
                     cursor.execute(query_ultima_nome, (f'%{obreiro_nome}%',))
@@ -1259,7 +1421,7 @@ elif modulo == "👤 Cadastro de Obreiros":
         
         if st.form_submit_button("Cadastrar Obreiro"):
             # Corrigido: Incluído o campo isento e o valor convertido para inteiro (1 ou 0)
-            executar_comando("INSERT INTO obreiros (nome, cim, grau, valor_mensalidade, isento) VALUES (?,?,?,?,?)", 
+            executar_comando("INSERT INTO obreiros (nome, cim, grau, valor_mensalidade, isento) VALUES (%s,%s,%s,%s,%s)",
                              (n, c, g, v, int(isento_check)))
             st.success("Membro Cadastrado com Sucesso!")
             st.rerun()
@@ -1292,9 +1454,9 @@ elif modulo == "👤 Cadastro de Obreiros":
                     if st.form_submit_button("Salvar Alteracoes"):
                         # Corrigido: Incluído isento no UPDATE
                         executar_comando("""
-                            UPDATE obreiros 
-                            SET nome = ?, cim = ?, grau = ?, valor_mensalidade = ?, isento = ? 
-                            WHERE id = ?
+                            UPDATE obreiros
+                            SET nome = %s, cim = %s, grau = %s, valor_mensalidade = %s, isento = %s
+                            WHERE id = %s
                         """, (novo_nome, novo_cim, novo_grau, novo_valor, int(novo_isento), int(dados_atuais['id'])))
                         st.success(f"Dados de {novo_nome} atualizados com sucesso!")
                         st.rerun()
@@ -1458,11 +1620,11 @@ elif modulo == "👥 Cadastro de Usuários":
                 if nome_usuario and email_usuario and senha_usuario:
                     if senha_usuario == confirmar_senha:
                         # Verificar se email já existe
-                        email_existe = buscar_dados("SELECT id FROM usuarios WHERE email = ?", (email_usuario,))
+                        email_existe = buscar_dados("SELECT id FROM usuarios WHERE email = %s", (email_usuario,))
                         if email_existe.empty:
                             data_cadastro = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                             resultado = executar_comando(
-                                "INSERT INTO usuarios (nome, email, senha, nivel_acesso, data_cadastro) VALUES (?, ?, ?, ?, ?)",
+                                "INSERT INTO usuarios (nome, email, senha, nivel_acesso, data_cadastro) VALUES (%s, %s, %s, %s, %s)",
                                 (nome_usuario, email_usuario, senha_usuario, nivel_acesso, data_cadastro)
                             )
                             if resultado:
@@ -1505,9 +1667,9 @@ elif modulo == "👥 Cadastro de Usuários":
                         
                         if st.form_submit_button("Salvar Alterações"):
                             executar_comando("""
-                                UPDATE usuarios 
-                                SET nome = ?, email = ?, nivel_acesso = ?, ativo = ? 
-                                WHERE id = ?
+                                UPDATE usuarios
+                                SET nome = %s, email = %s, nivel_acesso = %s, ativo = %s
+                                WHERE id = %s
                             """, (novo_nome_user, novo_email_user, novo_nivel_user, int(novo_ativo_user), int(dados_usuario['id'])))
                             st.success("Usuário atualizado com sucesso!")
                             st.rerun()
@@ -1549,7 +1711,7 @@ elif modulo == "📰 Notícias e Informações":
                     col_edit, col_del = st.columns(2)
                     with col_del:
                         if st.button(f"Arquivar", key=f"del_noticia_{row['id']}"):
-                            executar_comando("UPDATE noticias SET ativo = 0 WHERE id = ?", (row['id'],))
+                            executar_comando("UPDATE noticias SET ativo = 0 WHERE id = %s", (row['id'],))
                             st.rerun()
         else:
             st.info("Nenhuma notícia publicada.")
@@ -1565,7 +1727,7 @@ elif modulo == "📰 Notícias e Informações":
                 if titulo and conteudo:
                     executar_comando("""
                         INSERT INTO noticias (titulo, conteudo, data_publicacao, autor, ativo)
-                        VALUES (?, ?, ?, ?, 1)
+                        VALUES (%s, %s, %s, %s, 1)
                     """, (titulo, conteudo, data_pub.strftime('%Y-%m-%d'), autor))
                     st.success("Notícia publicada com sucesso!")
                     st.rerun()
@@ -1578,7 +1740,7 @@ elif modulo == "📰 Notícias e Informações":
 elif modulo == "📅 Eventos e Agenda":
     st.subheader("📅 Eventos e Agenda da Loja")
     
-    aba_eventos, aba_criar_evento = st.tabs(["Calendário de Eventos", "Criar Evento"])
+    aba_eventos, aba_criar_evento, aba_financeiro = st.tabs(["Calendário de Eventos", "Criar Evento", "📊 Financeiro do Evento"])
     
     with aba_eventos:
         df_eventos = buscar_dados("SELECT * FROM eventos ORDER BY data_evento ASC")
@@ -1597,10 +1759,28 @@ elif modulo == "📅 Eventos e Agenda":
                     if row['descricao']:
                         st.markdown("---")
                         st.write(row['descricao'])
-                    
-                    if st.button(f"Excluir Evento", key=f"del_evento_{row['id']}"):
-                        executar_comando("DELETE FROM eventos WHERE id = ?", (row['id'],))
+
+                    if st.button(f"Excluir Evento", key=f"del_evento_{row['id']}", type="secondary"):
+                        st.session_state['evento_para_excluir'] = row['id']
+                        st.session_state['evento_nome'] = row['titulo']
                         st.rerun()
+
+                # Confirmar exclusão se houver evento selecionado
+                if 'evento_para_excluir' in st.session_state and st.session_state['evento_para_excluir']:
+                    st.warning(f"⚠️ Ao excluir o evento '{st.session_state['evento_nome']}', os lançamentos financeiros NÃO serão apagados e continuarão no Livro Caixa.")
+                    col_conf1, col_conf2 = st.columns(2)
+                    with col_conf1:
+                        if st.button("✅ Confirmar Exclusão", type="primary"):
+                            executar_comando("DELETE FROM eventos WHERE id = %s", (st.session_state['evento_para_excluir'],))
+                            del st.session_state['evento_para_excluir']
+                            del st.session_state['evento_nome']
+                            st.success("Evento excluído com sucesso!")
+                            st.rerun()
+                    with col_conf2:
+                        if st.button("❌ Cancelar", type="secondary"):
+                            del st.session_state['evento_para_excluir']
+                            del st.session_state['evento_nome']
+                            st.rerun()
         else:
             st.info("Nenhum evento agendado.")
     
@@ -1617,12 +1797,122 @@ elif modulo == "📅 Eventos e Agenda":
                 if titulo and data_evento:
                     executar_comando("""
                         INSERT INTO eventos (titulo, descricao, data_evento, hora, local, tipo)
-                        VALUES (?, ?, ?, ?, ?, ?)
+                        VALUES (%s, %s, %s, %s, %s, %s)
                     """, (titulo, descricao, data_evento.strftime('%Y-%m-%d'), hora.strftime('%H:%M'), local, tipo))
                     st.success("Evento agendado com sucesso!")
                     st.rerun()
                 else:
                     st.error("Preencha título e data do evento.")
+    
+    with aba_financeiro:
+        st.subheader("📊 Gestão Financeira de Eventos")
+        
+        # Selecionar evento
+        df_eventos = buscar_dados("SELECT id, titulo, data_evento FROM eventos ORDER BY data_evento DESC")
+        
+        if df_eventos.empty:
+            st.info("Nenhum evento cadastrado. Crie um evento primeiro na aba 'Criar Evento'.")
+        else:
+            evento_opcoes = {f"{row['titulo']} - {formatar_data(row['data_evento'])}": row['id'] for _, row in df_eventos.iterrows()}
+            evento_selecionado = st.selectbox("Selecione o Evento", list(evento_opcoes.keys()))
+            evento_id = evento_opcoes[evento_selecionado]
+            
+            # Buscar transações do evento
+            df_transacoes_evento = buscar_dados("""
+                SELECT id, data, tipo, categoria, descricao, valor
+                FROM transacoes
+                WHERE evento_id = %s
+                ORDER BY data ASC
+            """, (evento_id,))
+            
+            # Calcular balanço
+            total_entradas = df_transacoes_evento[df_transacoes_evento['tipo'] == 'Entrada']['valor'].sum() if not df_transacoes_evento.empty else 0
+            total_saidas = df_transacoes_evento[df_transacoes_evento['tipo'] == 'Saída']['valor'].sum() if not df_transacoes_evento.empty else 0
+            saldo = total_entradas - total_saidas
+            
+            # Exibir resumo financeiro
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("💰 Total Entradas", formatar_moeda(total_entradas))
+            with col2:
+                st.metric("💸 Total Saídas", formatar_moeda(total_saidas))
+            with col3:
+                st.metric("📊 Saldo do Evento", formatar_moeda(saldo), delta=f"{saldo:.2f}")
+            
+            st.markdown("---")
+            
+            # Formulário de lançamento
+            st.subheader("📝 Lançar Movimentação Financeira")
+            
+            with st.form("form_lancamento_evento"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    data_lanc = st.date_input("Data", value=date.today())
+                    tipo_lanc = st.selectbox("Tipo", ["Entrada", "Saída"])
+                with col2:
+                    categoria_lanc = st.text_input("Categoria (ex: Ingressos, Alimentação, Som)")
+                    valor_lanc = st.number_input("Valor (R$)", min_value=0.01, step=0.01, format="%.2f")
+                
+                descricao_lanc = st.text_input("Descrição / Favorecido")
+                
+                if st.form_submit_button("💾 Lançar no Evento"):
+                    if valor_lanc > 0:
+                        if not descricao_lanc.strip():
+                            descricao_lanc = f"{tipo_lanc} - {categoria_lanc}"
+
+                        try:
+                            resultado = executar_comando("""
+                                INSERT INTO transacoes (data, tipo, categoria, descricao, valor, mes_competencia, ano_competencia, tipo_caixa, evento_id)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, 'Eventos', %s)
+                            """, (data_lanc.strftime('%Y-%m-%d'), tipo_lanc, categoria_lanc if categoria_lanc else 'Evento',
+                                  descricao_lanc, valor_lanc, data_lanc.strftime('%B'), data_lanc.strftime('%Y'), evento_id))
+
+                            if resultado:
+                                st.success("✅ Lançamento realizado com sucesso!")
+                                st.rerun()
+                            else:
+                                st.error("❌ Erro ao realizar lançamento. Tente novamente.")
+                        except Exception as e:
+                            st.error(f"❌ Erro: {str(e)}")
+                    else:
+                        st.error("O valor deve ser maior que zero.")
+            
+            st.markdown("---")
+            
+            # Histórico de lançamentos do evento
+            st.subheader("📋 Histórico de Lançamentos do Evento")
+            
+            if not df_transacoes_evento.empty:
+                df_visualizacao = df_transacoes_evento.copy()
+                df_visualizacao['valor'] = df_visualizacao['valor'].apply(lambda x: f"R$ {float(x):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                df_visualizacao['data'] = pd.to_datetime(df_visualizacao['data']).dt.strftime('%d/%m/%Y')
+                
+                st.dataframe(df_visualizacao, use_container_width=True, hide_index=True)
+                
+                # Opção de finalizar evento e exportar relatório
+                st.markdown("---")
+                col_btn1, col_btn2 = st.columns(2)
+                with col_btn1:
+                    if st.button("🏁 Finalizar Evento", type="primary"):
+                        st.success("Evento finalizado com sucesso!")
+                        st.info(f"Resumo do Evento:\n- Total Entradas: {formatar_moeda(total_entradas)}\n- Total Saídas: {formatar_moeda(total_saidas)}\n- Saldo Final: {formatar_moeda(saldo)}")
+                with col_btn2:
+                    if st.button("📄 Exportar Relatório Financeiro"):
+                        # Gerar relatório HTML
+                        relatorio_html = gerar_relatorio_evento(evento_id, evento_selecionado, df_transacoes_evento, total_entradas, total_saidas, saldo)
+                        
+                        # Salvar arquivo HTML
+                        nome_arquivo = f"Apuracao_Financeira_{evento_selecionado.replace(' - ', '_').replace(' ', '_').replace('/', '_').replace('\\\\', '_')}.html"
+                        caminho_arquivo = f"C:\\Users\\Rodrigo  Garcia\\Desktop\\Maconaria\\{nome_arquivo}"
+                        
+                        with open(caminho_arquivo, 'w', encoding='utf-8') as f:
+                            f.write(relatorio_html)
+                        
+                        st.success(f"Relatório exportado com sucesso!")
+                        st.info(f"Arquivo salvo em: {caminho_arquivo}")
+                        st.markdown(f'<a href="file:///{caminho_arquivo.replace("\\", "/")}" target="_blank">📂 Abrir Relatório</a>', unsafe_allow_html=True)
+            else:
+                st.info("Nenhum lançamento financeiro registrado para este evento.")
 
 # ==========================================
 # MÓDULO 7: ANIVERSARIANTES
@@ -1692,7 +1982,7 @@ elif modulo == "🎂 Aniversariantes":
                 data_nasc = st.date_input("Data de Nascimento", value=valor_padrao)
                 
                 if st.form_submit_button("Salvar Data de Nascimento"):
-                    executar_comando("UPDATE obreiros SET data_nascimento = ? WHERE id = ?", 
+                    executar_comando("UPDATE obreiros SET data_nascimento = %s WHERE id = %s",
                                    (data_nasc.strftime('%Y-%m-%d'), obreiro_data['id']))
                     st.success("Data de nascimento atualizada!")
                     st.rerun()
@@ -1727,35 +2017,38 @@ elif modulo == "📅 Agendador de Pagamentos":
             if st.form_submit_button("Criar Agendamento"):
                 if descricao and valor_total > 0 and numero_parcelas > 0:
                     try:
-                        conn = sqlite3.connect(DB_PATH)
+                        conn = get_connection()
                         cursor = conn.cursor()
-                        
+
+                        # Calcular valor de cada parcela
+                        valor_parcela = valor_total / numero_parcelas
+
                         # Inserir agendamento principal
                         data_criacao = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                         cursor.execute("""
-                            INSERT INTO agendamentos_pagamentos 
+                            INSERT INTO agendamentos_pagamentos
                             (descricao, valor_total, numero_parcelas, data_primeira_parcela, intervalo_dias, status, data_criacao, observacoes)
-                            VALUES (?, ?, ?, ?, ?, 'Pendente', ?, ?)
-                        """, (descricao, valor_total, numero_parcelas, data_primeira.strftime('%Y-%m-%d'), 
-                              intervalo_dias, data_criacao, observacoes))
-                        
-                        agendamento_id = cursor.lastrowid
-                        
-                        # Calcular e inserir parcelas
-                        valor_parcela = valor_total / numero_parcelas
+                            VALUES (%s, %s, %s, %s, %s, 'Pendente', %s, %s)
+                        """, (descricao, valor_total, numero_parcelas, data_primeira.strftime('%Y-%m-%d'), intervalo_dias, data_criacao, observacoes))
+
+                        # Obter o ID do agendamento criado
+                        cursor.execute("SELECT lastval()")
+                        agendamento_id = cursor.fetchone()[0]
+
+                        # Inserir parcelas
                         for i in range(numero_parcelas):
                             data_vencimento = datetime.strptime(data_primeira.strftime('%Y-%m-%d'), '%Y-%m-%d')
                             data_vencimento = data_vencimento + pd.Timedelta(days=i*intervalo_dias)
-                            
+
                             cursor.execute("""
-                                INSERT INTO parcelas 
+                                INSERT INTO parcelas
                                 (agendamento_id, numero_parcela, valor_parcela, data_vencimento, status)
-                                VALUES (?, ?, ?, ?, 'Pendente')
+                                VALUES (%s, %s, %s, %s, 'Pendente')
                             """, (agendamento_id, i+1, valor_parcela, data_vencimento.strftime('%Y-%m-%d')))
-                        
+
                         conn.commit()
                         conn.close()
-                        
+
                         st.success(f"✅ Agendamento criado com sucesso! {numero_parcelas} parcelas de R$ {valor_parcela:.2f}")
                         st.rerun()
                     except Exception as e:
@@ -1826,14 +2119,14 @@ elif modulo == "📅 Agendador de Pagamentos":
                     
                     with col_btn1:
                         if st.button(f"Marcar como PAGO", key=f"concluir_{row['id']}"):
-                            executar_comando("UPDATE agendamentos_pagamentos SET status = 'Concluído' WHERE id = ?", (row['id'],))
+                            executar_comando("UPDATE agendamentos_pagamentos SET status = 'Concluído' WHERE id = %s", (row['id'],))
                             st.success("Agendamento marcado como concluído!")
                             st.rerun()
                     
                     with col_btn2:
                         if st.button(f"Excluir Agendamento", key=f"excluir_{row['id']}", type="secondary"):
-                            executar_comando("DELETE FROM parcelas WHERE agendamento_id = ?", (row['id'],))
-                            executar_comando("DELETE FROM agendamentos_pagamentos WHERE id = ?", (row['id'],))
+                            executar_comando("DELETE FROM parcelas WHERE agendamento_id = %s", (row['id'],))
+                            executar_comando("DELETE FROM agendamentos_pagamentos WHERE id = %s", (row['id'],))
                             st.success("Agendamento excluído!")
                             st.rerun()
         else:
@@ -1869,9 +2162,9 @@ elif modulo == "📅 Agendador de Pagamentos":
                             try:
                                 # Atualizar status da parcela
                                 executar_comando("""
-                                    UPDATE parcelas 
-                                    SET status = 'Paga', data_pagamento = ? 
-                                    WHERE id = ?
+                                    UPDATE parcelas
+                                    SET status = 'Paga', data_pagamento = %s
+                                    WHERE id = %s
                                 """, (data_pagamento.strftime('%Y-%m-%d'), st.session_state['pagar_parcela_id']))
                                 
                                 # Criar lançamento no livro caixa
@@ -1882,11 +2175,11 @@ elif modulo == "📅 Agendador de Pagamentos":
                                 descricao_completa = f"{st.session_state['pagar_parcela_desc']} - Parcela {st.session_state['pagar_parcela_num']} - {descricao_pagamento}"
                                 
                                 executar_comando("""
-                                    INSERT INTO transacoes 
+                                    INSERT INTO transacoes
                                     (data, tipo, categoria, descricao, valor, mes_competencia, ano_competencia, tipo_caixa)
-                                    VALUES (?, 'Saída', ?, ?, ?, ?, ?, 'Bancário')
-                                """, (data_pagamento.strftime('%Y-%m-%d'), categoria_pagamento, 
-                                      descricao_completa, st.session_state['pagar_parcela_valor'], 
+                                    VALUES (%s, 'Saída', %s, %s, %s, %s, %s, 'Bancário')
+                                """, (data_pagamento.strftime('%Y-%m-%d'), categoria_pagamento,
+                                      descricao_completa, st.session_state['pagar_parcela_valor'],
                                       mes_comp, ano_comp))
                                 
                                 # Limpar session state
@@ -1951,7 +2244,7 @@ elif modulo == "📅 Agendador de Pagamentos":
                 if row['status'] == 'Pendente':
                     data_venc = datetime.strptime(row['data_vencimento'], '%Y-%m-%d').date()
                     if data_venc < hoje:
-                        executar_comando("UPDATE parcelas SET status = 'Atrasada' WHERE id = ?", (row['id'],))
+                        executar_comando("UPDATE parcelas SET status = 'Atrasada' WHERE id = %s", (row['id'],))
             
             # Recarregar dados após atualização
             df_contas = buscar_dados(query_parcelas, params_parcelas)
@@ -2047,9 +2340,9 @@ elif modulo == "📅 Agendador de Pagamentos":
                                 try:
                                     # Atualizar status da parcela
                                     executar_comando("""
-                                        UPDATE parcelas 
-                                        SET status = 'Paga', data_pagamento = ? 
-                                        WHERE id = ?
+                                        UPDATE parcelas
+                                        SET status = 'Paga', data_pagamento = %s
+                                        WHERE id = %s
                                     """, (data_pagamento.strftime('%Y-%m-%d'), parcela_selecionada['id']))
                                     
                                     # Criar lançamento no livro caixa
@@ -2060,11 +2353,11 @@ elif modulo == "📅 Agendador de Pagamentos":
                                     descricao_completa = f"{parcela_selecionada['agendamento_descricao']} - {descricao_pagamento}"
                                     
                                     executar_comando("""
-                                        INSERT INTO transacoes 
+                                        INSERT INTO transacoes
                                         (data, tipo, categoria, descricao, valor, mes_competencia, ano_competencia, tipo_caixa)
-                                        VALUES (?, 'Saída', ?, ?, ?, ?, ?, 'Bancário')
-                                    """, (data_pagamento.strftime('%Y-%m-%d'), categoria_pagamento, 
-                                          descricao_completa, parcela_selecionada['valor_parcela'], 
+                                        VALUES (%s, 'Saída', %s, %s, %s, %s, %s, 'Bancário')
+                                    """, (data_pagamento.strftime('%Y-%m-%d'), categoria_pagamento,
+                                          descricao_completa, parcela_selecionada['valor_parcela'],
                                           mes_comp, ano_comp))
                                     
                                     st.success(f"✅ Pagamento registrado e lançamento criado no livro caixa!")
@@ -2102,33 +2395,131 @@ elif modulo == "💾 Backup e Restauração":
     with aba_backup:
         st.write("### Fazer Backup do Banco de Dados")
         st.info("Esta opção permite baixar uma cópia completa do banco de dados.")
-        
+
+        # Detectar tipo de banco
+        from database_config import DB_TYPE
+        st.info(f"Tipo de banco atual: **{DB_TYPE.upper()}**")
+
         try:
-            with open(DB_PATH, 'rb') as f:
-                db_bytes = f.read()
-            
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            st.download_button(
-                label="📥 Baixar Backup",
-                data=db_bytes,
-                file_name=f"financas_loja_backup_{timestamp}.db",
-                mime="application/x-sqlite3",
-                use_container_width=True
-            )
-            
-            st.success(f"Tamanho do backup: {len(db_bytes) / 1024:.2f} KB")
+            if DB_TYPE == 'sqlite':
+                # Backup SQLite: copiar arquivo .db
+                with open(DB_PATH, 'rb') as f:
+                    db_bytes = f.read()
+
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                st.download_button(
+                    label="📥 Baixar Backup SQLite",
+                    data=db_bytes,
+                    file_name=f"financas_loja_backup_{timestamp}.db",
+                    mime="application/x-sqlite3",
+                    use_container_width=True
+                )
+
+                st.success(f"Tamanho do backup: {len(db_bytes) / 1024:.2f} KB")
+            else:
+                # Backup PostgreSQL: exportar dados usando Python (sem pg_dump)
+                from database_config import get_connection
+                from config_postgres import POSTGRES_CONFIG
+
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                backup_file = f"financas_loja_backup_{timestamp}.sql"
+
+                # Conectar ao PostgreSQL
+                conn = get_connection()
+                cursor = conn.cursor()
+
+                # Obter lista de tabelas
+                cursor.execute("""
+                    SELECT table_name FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+                """)
+                tabelas = [row[0] for row in cursor.fetchall()]
+
+                # Gerar SQL de backup
+                sql_content = f"-- Backup PostgreSQL - {timestamp}\n"
+                sql_content += f"-- Database: {POSTGRES_CONFIG['database']}\n\n"
+
+                for tabela in tabelas:
+                    # DROP TABLE IF EXISTS
+                    sql_content += f"DROP TABLE IF EXISTS {tabela} CASCADE;\n"
+
+                    # Obter estrutura da tabela
+                    cursor.execute(f"""
+                        SELECT column_name, data_type, is_nullable, column_default
+                        FROM information_schema.columns
+                        WHERE table_name = '{tabela}'
+                        ORDER BY ordinal_position
+                    """)
+                    colunas = cursor.fetchall()
+
+                    # Criar CREATE TABLE
+                    sql_content += f"CREATE TABLE {tabela} (\n"
+                    col_defs = []
+                    for col in colunas:
+                        col_name, data_type, is_nullable, col_default = col
+                        col_def = f"    {col_name} {data_type}"
+                        if is_nullable == 'NO':
+                            col_def += " NOT NULL"
+                        if col_default:
+                            col_def += f" DEFAULT {col_default}"
+                        col_defs.append(col_def)
+                    sql_content += ",\n".join(col_defs)
+                    sql_content += "\n);\n\n"
+
+                    # Exportar dados
+                    cursor.execute(f"SELECT * FROM {tabela}")
+                    rows = cursor.fetchall()
+                    col_names = [desc[0] for desc in cursor.description]
+
+                    if rows:
+                        for row in rows:
+                            values = []
+                            for val in row:
+                                if val is None:
+                                    values.append('NULL')
+                                elif isinstance(val, str):
+                                    values.append(f"'{val.replace("'", "''")}'")
+                                elif isinstance(val, (int, float)):
+                                    values.append(str(val))
+                                else:
+                                    values.append(f"'{str(val)}'")
+                            sql_content += f"INSERT INTO {tabela} ({', '.join(col_names)}) VALUES ({', '.join(values)});\n"
+                        sql_content += "\n"
+
+                cursor.close()
+                conn.close()
+
+                st.download_button(
+                    label="📥 Baixar Backup PostgreSQL",
+                    data=sql_content.encode('utf-8'),
+                    file_name=backup_file,
+                    mime="application/sql",
+                    use_container_width=True
+                )
+                st.success(f"Backup criado com sucesso! Tamanho: {len(sql_content) / 1024:.2f} KB")
+
         except Exception as e:
             st.error(f"Erro ao criar backup: {str(e)}")
     
     with aba_restaurar:
         st.write("### Restaurar Backup do Banco de Dados")
         st.warning("⚠️ **ATENÇÃO**: A restauração substituirá todos os dados atuais pelo backup selecionado. Esta ação não pode ser desfeita!")
-        
-        arquivo_backup = st.file_uploader(
-            "Selecione o arquivo de backup (.db)",
-            type=['db'],
-            help="Selecione um arquivo de backup do banco de dados SQLite"
-        )
+
+        from database_config import DB_TYPE
+        st.info(f"Tipo de banco atual: **{DB_TYPE.upper()}**")
+
+        if DB_TYPE == 'sqlite':
+            arquivo_backup = st.file_uploader(
+                "Selecione o arquivo de backup (.db)",
+                type=['db'],
+                help="Selecione um arquivo de backup do banco de dados SQLite"
+            )
+        else:
+            arquivo_backup = st.file_uploader(
+                "Selecione o arquivo de backup (.sql)",
+                type=['sql'],
+                help="Selecione um arquivo de backup do banco de dados PostgreSQL"
+            )
         
         if arquivo_backup:
             st.info(f"Arquivo selecionado: {arquivo_backup.name} ({arquivo_backup.size / 1024:.2f} KB)")
@@ -2142,17 +2533,41 @@ elif modulo == "💾 Backup e Restauração":
             if st.button("📤 Restaurar Backup", use_container_width=True, type="primary"):
                 if confirmar_nome.upper() == "CONFIRMAR" and confirmar:
                     try:
-                        # Criar backup de segurança antes de restaurar
-                        backup_seguranca = f"{DB_PATH}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                        import shutil
-                        shutil.copy2(DB_PATH, backup_seguranca)
-                        
-                        # Restaurar o backup
-                        with open(DB_PATH, 'wb') as f:
-                            f.write(arquivo_backup.getvalue())
-                        
-                        st.success(f"✅ Backup restaurado com sucesso!")
-                        st.info(f"📁 Backup de segurança salvo em: {backup_seguranca}")
+                        if DB_TYPE == 'sqlite':
+                            # Restaurar SQLite
+                            backup_seguranca = f"{DB_PATH}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                            import shutil
+                            shutil.copy2(DB_PATH, backup_seguranca)
+
+                            with open(DB_PATH, 'wb') as f:
+                                f.write(arquivo_backup.getvalue())
+
+                            st.success(f"✅ Backup SQLite restaurado com sucesso!")
+                            st.info(f"📁 Backup de segurança salvo em: {backup_seguranca}")
+                        else:
+                            # Restaurar PostgreSQL usando Python (sem psql)
+                            from database_config import get_connection
+                            from config_postgres import POSTGRES_CONFIG
+
+                            # Ler conteúdo do SQL
+                            sql_content = arquivo_backup.getvalue().decode('utf-8')
+
+                            # Conectar ao PostgreSQL
+                            conn = get_connection()
+                            cursor = conn.cursor()
+
+                            # Executar comandos SQL
+                            try:
+                                cursor.execute(sql_content)
+                                conn.commit()
+                                st.success(f"✅ Backup PostgreSQL restaurado com sucesso!")
+                            except Exception as e:
+                                conn.rollback()
+                                st.error(f"❌ Erro ao restaurar PostgreSQL: {str(e)}")
+                            finally:
+                                cursor.close()
+                                conn.close()
+
                         st.rerun()
                     except Exception as e:
                         st.error(f"❌ Erro ao restaurar backup: {str(e)}")
