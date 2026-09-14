@@ -396,9 +396,18 @@ def buscar_dados(query, params=()):
         conn.close()
         return pd.DataFrame(resultados, columns=colunas)
     except (sqlite3.OperationalError, psycopg2.Error) as e:
-        print(f"Erro na query: {e}")
+        _exibir_erro(f"Erro na query: {e}")
         print(f"Query: {query}")
         return pd.DataFrame()
+
+def _exibir_erro(mensagem):
+    """Mostra erro no Streamlit quando disponível, senão imprime no console"""
+    try:
+        import streamlit as st
+        st.error(mensagem)
+    except ImportError:
+        pass
+    print(mensagem)
 
 def executar_comando(query, params=()):
     """Executa um comando SQL (INSERT, UPDATE, DELETE)"""
@@ -411,7 +420,28 @@ def executar_comando(query, params=()):
         conn.close()
         return True
     except Exception as e:
-        print(f"Erro ao executar comando: {str(e)}")
+        _exibir_erro(f"Erro ao executar comando: {str(e)}")
+        return False
+
+def executar_lote(comandos):
+    """Executa vários comandos (query, params) em uma única transação atômica.
+    Se qualquer comando falhar, tudo é desfeito (rollback)."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        for query, params in comandos:
+            cursor.execute(query, params)
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as e:
+        try:
+            conn.rollback()
+            conn.close()
+        except Exception:
+            pass
+        _exibir_erro(f"Erro ao executar lote: {str(e)}")
         return False
 
 def formatar_moeda(valor):

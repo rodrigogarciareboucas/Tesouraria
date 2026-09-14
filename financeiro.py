@@ -6,7 +6,7 @@ from datetime import datetime, date
 import plotly.express as px
 import plotly.graph_objects as go
 from fpdf import FPDF
-from database_config import DB_PATH, init_db, buscar_dados, executar_comando, formatar_moeda, formatar_data, get_connection
+from database_config import DB_PATH, init_db, buscar_dados, executar_comando, executar_lote, formatar_moeda, formatar_data, get_connection
 
 # ==========================================
 # FUNÇÃO PARA GERAR RELATÓRIO DE EVENTO
@@ -1300,28 +1300,36 @@ elif modulo == "💳 Carteira de Obreiros (Mensalidades)":
                         ("Auxilio Funeral (PAF)", val_paf), ("Anuidade GOB Federal", val_fed),
                         ("Anuidade GOB RN", val_rn), ("Taxa Extra", val_extra)
                     ]
+
+                    # Converter mês selecionado para número
+                    meses_num = {
+                        'Janeiro': 1, 'Fevereiro': 2, 'Março': 3, 'Abril': 4,
+                        'Maio': 5, 'Junho': 6, 'Julho': 7, 'Agosto': 8,
+                        'Setembro': 9, 'Outubro': 10, 'Novembro': 11, 'Dezembro': 12
+                    }
+                    mes_num = meses_num.get(mes_b, 1)
+                    # Usar o primeiro dia do mês selecionado como data do lançamento
+                    data_lancamento = date(int(ano_b), mes_num, 1).strftime('%Y-%m-%d')
+
+                    # Montar todos os inserts para executar em uma única transação
+                    comandos = []
+                    resumo = []
                     for cat, val in pagamentos:
                         if val > 0:
                             # Usar nome personalizado para Taxa Extra
-                            categoria_final = cat
-                            if cat == "Taxa Extra" and nome_extra.strip():
-                                categoria_final = nome_extra.strip()
-                            
-                            # Converter mês selecionado para número
-                            meses_num = {
-                                'Janeiro': 1, 'Fevereiro': 2, 'Março': 3, 'Abril': 4,
-                                'Maio': 5, 'Junho': 6, 'Julho': 7, 'Agosto': 8,
-                                'Setembro': 9, 'Outubro': 10, 'Novembro': 11, 'Dezembro': 12
-                            }
-                            mes_num = meses_num.get(mes_b, 1)
-                            # Usar o último dia do mês selecionado como data do lançamento
-                            data_lancamento = date(int(ano_b), mes_num, 1).strftime('%Y-%m-%d')
-                            
+                            categoria_final = nome_extra.strip() if cat == "Taxa Extra" and nome_extra.strip() else cat
                             descricao = f'Entrada/{irmao_sel}/{categoria_final}/{val}'
-                            executar_comando("INSERT INTO transacoes (data, tipo, categoria, descricao, valor, obreiro_id, mes_competencia, ano_competencia, tipo_caixa) VALUES (%s, 'Entrada', %s, %s, %s, %s, %s, %s, 'Bancário')",
-                                             (data_lancamento, categoria_final, descricao, val, id_irmao, mes_b, ano_b))
-                    st.success("Lancamento efetuado com sucesso.")
-                    st.rerun()
+                            comandos.append((
+                                "INSERT INTO transacoes (data, tipo, categoria, descricao, valor, obreiro_id, mes_competencia, ano_competencia, tipo_caixa) VALUES (%s, 'Entrada', %s, %s, %s, %s, %s, %s, 'Bancário')",
+                                (data_lancamento, categoria_final, descricao, val, id_irmao, mes_b, ano_b)
+                            ))
+                            resumo.append(f"{categoria_final} ({formatar_moeda(val)})")
+
+                    if not comandos:
+                        st.warning("Nenhum valor informado. Preencha ao menos uma categoria com valor maior que zero.")
+                    elif executar_lote(comandos):
+                        st.success(f"Baixa registrada para {irmao_sel} — {mes_b}/{ano_b}: {', '.join(resumo)}")
+                        st.rerun()
 
     with aba_inad:
         st.write("### Auditoria de Inadimplencia")
