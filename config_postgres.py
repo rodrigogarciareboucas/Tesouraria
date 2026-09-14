@@ -13,7 +13,7 @@ try:
 except:
     pass  # Ignorar erro se .env não existir ou estiver corrompido
 
-# String de conexão direta do Supabase (hardcoded temporariamente para teste)
+# String de conexão direta do Supabase (sem SSL - SSL foi desmarcado nas configurações)
 DATABASE_URL = "postgresql://postgres:a4kaGf7zYmiq6CAP@db.umlwznpctkdzhghhpjgk.supabase.co:5432/postgres"
 
 # Configurações do Supabase para psycopg2

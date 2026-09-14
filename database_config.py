@@ -34,20 +34,8 @@ def get_connection():
     if DB_TYPE == 'postgresql':
         if not DATABASE_URL:
             raise ValueError("DATABASE_URL não encontrada. Verifique config_postgres.py")
-
-        # Tenta conectar com SSL
-        try:
-            return psycopg2.connect(DATABASE_URL, sslmode='require')
-        except Exception as e:
-            # Se falhar, tenta sem SSL
-            try:
-                return psycopg2.connect(DATABASE_URL, sslmode='disable')
-            except Exception as e2:
-                # Se falhar, tenta com allow
-                try:
-                    return psycopg2.connect(DATABASE_URL, sslmode='allow')
-                except Exception as e3:
-                    raise Exception(f"Erro com SSL require: {str(e)}\nErro com SSL disable: {str(e2)}\nErro com SSL allow: {str(e3)}")
+        # Conectar sem SSL (SSL foi desmarcado nas configurações do Supabase)
+        return psycopg2.connect(DATABASE_URL)
     else:
         return sqlite3.connect(DB_PATH)
 
