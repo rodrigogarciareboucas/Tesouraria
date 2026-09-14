@@ -19,13 +19,13 @@ try:
     # Se estiver no Streamlit Cloud, usar st.secrets
     if hasattr(st, 'secrets'):
         POSTGRES_CONFIG = {
-            'host': st.secrets.get('POSTGRES_HOST', 'db.umlwznpctkdzhghhpjgk.supabase.co'),
-            'port': int(st.secrets.get('POSTGRES_PORT', 5432)),
-            'database': st.secrets.get('POSTGRES_DATABASE', 'postgres'),
-            'user': st.secrets.get('POSTGRES_USER', 'postgres'),
-            'password': st.secrets.get('POSTGRES_PASSWORD', 'a4kaGf7zYmiq6CAP'),
+            'host': st.secrets['POSTGRES_HOST'],
+            'port': int(st.secrets['POSTGRES_PORT']),
+            'database': st.secrets['POSTGRES_DATABASE'],
+            'user': st.secrets['POSTGRES_USER'],
+            'password': st.secrets['POSTGRES_PASSWORD'],
         }
-        sslmode = st.secrets.get('POSTGRES_SSLMODE', 'require')
+        sslmode = st.secrets['POSTGRES_SSLMODE']
     else:
         # Usar variáveis de ambiente locais
         POSTGRES_CONFIG = {
@@ -36,8 +36,8 @@ try:
             'password': os.getenv('POSTGRES_PASSWORD', 'a4kaGf7zYmiq6CAP'),
         }
         sslmode = os.getenv('POSTGRES_SSLMODE', 'require')
-except ImportError:
-    # Se streamlit não estiver disponível, usar variáveis de ambiente
+except (ImportError, KeyError):
+    # Se streamlit não estiver disponível ou secrets não existirem, usar variáveis de ambiente
     POSTGRES_CONFIG = {
         'host': os.getenv('POSTGRES_HOST', 'db.umlwznpctkdzhghhpjgk.supabase.co'),
         'port': int(os.getenv('POSTGRES_PORT', 5432)),
