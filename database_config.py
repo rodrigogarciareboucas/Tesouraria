@@ -32,29 +32,10 @@ except ImportError:
 def get_connection():
     """Retorna conexão com o banco de dados configurado"""
     if DB_TYPE == 'postgresql':
-        if not POSTGRES_CONFIG:
-            raise ValueError("Configuração PostgreSQL não encontrada. Verifique config_postgres.py")
-        # Adicionar SSL para Supabase - tentar usar st.secrets primeiro
-        try:
-            import streamlit as st
-            if hasattr(st, 'secrets'):
-                sslmode = st.secrets.get('POSTGRES_SSLMODE', 'require')
-            else:
-                import os
-                sslmode = os.getenv('POSTGRES_SSLMODE', 'require')
-        except ImportError:
-            import os
-            sslmode = os.getenv('POSTGRES_SSLMODE', 'require')
-
-        # Tentar conectar sem SSL primeiro para debug
-        try:
-            return psycopg2.connect(**POSTGRES_CONFIG, sslmode=sslmode)
-        except Exception as e:
-            # Se falhar com SSL, tentar sem SSL
-            try:
-                return psycopg2.connect(**POSTGRES_CONFIG)
-            except Exception as e2:
-                raise Exception(f"Erro com SSL: {str(e)}\nErro sem SSL: {str(e2)}")
+        if not DATABASE_URL:
+            raise ValueError("DATABASE_URL não encontrada. Verifique config_postgres.py")
+        # Usar DATABASE_URL diretamente
+        return psycopg2.connect(DATABASE_URL)
     else:
         return sqlite3.connect(DB_PATH)
 

@@ -13,7 +13,10 @@ try:
 except:
     pass  # Ignorar erro se .env não existir ou estiver corrompido
 
-# Configurações do Supabase (hardcoded temporariamente para teste)
+# String de conexão direta do Supabase (hardcoded temporariamente para teste)
+DATABASE_URL = "postgresql://postgres:a4kaGf7zYmiq6CAP@db.umlwznpctkdzhghhpjgk.supabase.co:5432/postgres"
+
+# Configurações do Supabase para psycopg2
 POSTGRES_CONFIG = {
     'host': 'db.umlwznpctkdzhghhpjgk.supabase.co',
     'port': 5432,
@@ -21,8 +24,3 @@ POSTGRES_CONFIG = {
     'user': 'postgres',
     'password': 'a4kaGf7zYmiq6CAP',
 }
-
-sslmode = 'require'
-
-# String de conexão (com SSL para Supabase)
-DATABASE_URL = f"postgresql://{POSTGRES_CONFIG['user']}:{POSTGRES_CONFIG['password']}@{POSTGRES_CONFIG['host']}:{POSTGRES_CONFIG['port']}/{POSTGRES_CONFIG['database']}?sslmode={sslmode}"
