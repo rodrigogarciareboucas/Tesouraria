@@ -13,11 +13,13 @@ Crie um arquivo `.env` na raiz do projeto com as credenciais do PostgreSQL na nu
 
 ```
 POSTGRES_HOST=seu-host-postgres
-POSTGRES_PORT=5432
-POSTGRES_DATABASE=financas_loja
+POSTGRES_PORT=6543
+POSTGRES_DATABASE=postgres
 POSTGRES_USER=seu-usuario
 POSTGRES_PASSWORD=sua-senha
 ```
+
+> **Nota Supabase:** use o **Pooler** (host `aws-0-<regiao>.pooler.supabase.com`, porta `6543`, usuário `postgres.<project-ref>`). A conexão direta na porta 5432 exige IPv6 e não funciona na maioria dos serviços de nuvem (Streamlit Cloud, Render, etc.). Copie a string em **Settings > Database > Connection string > Transaction pooler**.
 
 ### 2. Banco PostgreSQL na Nuvem
 
@@ -25,7 +27,7 @@ POSTGRES_PASSWORD=sua-senha
 1. Acesse https://supabase.com
 2. Crie um projeto novo
 3. Vá em Settings > Database
-4. Copie as credenciais (host, database, user, password)
+4. Copie a connection string do **Transaction Pooler** (porta 6543)
 5. Coloque no arquivo `.env`
 
 #### Opção B: Railway (Grátis)
@@ -59,8 +61,8 @@ POSTGRES_PASSWORD=sua-senha
    - Adicione as seguintes secrets:
      ```
      POSTGRES_HOST=seu-host-postgres
-     POSTGRES_PORT=5432
-     POSTGRES_DATABASE=financas_loja
+     POSTGRES_PORT=6543
+     POSTGRES_DATABASE=postgres
      POSTGRES_USER=seu-usuario
      POSTGRES_PASSWORD=sua-senha
      ```
