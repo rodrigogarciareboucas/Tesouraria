@@ -670,6 +670,18 @@ if st.session_state.get('modo_obreiro') and not st.session_state.get('usuario_lo
         chave = (mes_c, _cat_key_ob(t['categoria']))
         pagos[chave] = pagos.get(chave, 0.0) + float(t['valor'])
 
+    # Pagamentos PIX aguardando baixa do tesoureiro
+    df_pend = buscar_dados("""
+        SELECT mes_competencia, categoria, valor FROM pagamentos_pendentes
+        WHERE obreiro_id = %s AND ano_competencia = %s AND status = 'Aguardando'
+    """, (int(row_ob['id']), ano_atual))
+    pendentes = set()
+    for _, t in df_pend.iterrows():
+        mes_c = t['mes_competencia']
+        if mes_c in meses_en_pt:
+            mes_c = meses_en_pt[mes_c]
+        pendentes.add((mes_c, _cat_key_ob(t['categoria'])))
+
     valor_mensal = float(row_ob['valor_mensalidade'])
     isento = int(row_ob['isento'] or 0) == 1
 
@@ -677,11 +689,17 @@ if st.session_state.get('modo_obreiro') and not st.session_state.get('usuario_lo
     for m in MESES_AA:
         pago = pagos.get((m, 'Mensalidade Loja'), 0.0)
         quitado = valor_mensal > 0 and pago >= valor_mensal
+        if quitado:
+            situacao = 'Quitado'
+        elif (m, 'Mensalidade Loja') in pendentes:
+            situacao = 'Aguardando aprovação'
+        else:
+            situacao = 'Em aberto'
         linhas_ficha.append({
             'Mês': m,
             'Mensalidade': formatar_moeda(valor_mensal),
             'Pago': formatar_moeda(pago) if pago > 0 else '-',
-            'Situação': 'Quitado' if quitado else 'Em aberto'
+            'Situação': situacao
         })
 
     st.write(f"### 📋 Suas Mensalidades — {ano_atual}")
@@ -702,11 +720,19 @@ if st.session_state.get('modo_obreiro') and not st.session_state.get('usuario_lo
 
         itens = []
         for m in MESES_AA:
-            if pagos.get((m, 'Mensalidade Loja'), 0.0) < valor_mensal:
+            if pagos.get((m, 'Mensalidade Loja'), 0.0) < valor_mensal and (m, 'Mensalidade Loja') not in pendentes:
                 itens.append({'Pagar': False, 'Mês': m, 'Item': 'Mensalidade Loja', 'Valor': valor_mensal})
             for cat_nome, cat_valor in TAXAS_PADRAO:
-                if (m, cat_nome) not in pagos:
+                if (m, cat_nome) not in pagos and (m, cat_nome) not in pendentes:
                     itens.append({'Pagar': False, 'Mês': m, 'Item': cat_nome, 'Valor': cat_valor})
+
+        if not df_pend.empty:
+            st.info("⏳ Itens aguardando aprovação do tesoureiro:")
+            df_pend_show = df_pend.rename(columns={
+                'mes_competencia': 'Mês', 'categoria': 'Item', 'valor': 'Valor'
+            })[['Mês', 'Item', 'Valor']]
+            df_pend_show['Valor'] = df_pend_show['Valor'].apply(formatar_moeda)
+            st.dataframe(df_pend_show, hide_index=True, use_container_width=True)
 
         if not itens:
             st.success("Parabéns! Todos os seus débitos do ano estão quitados.")
@@ -745,7 +771,7 @@ if st.session_state.get('modo_obreiro') and not st.session_state.get('usuario_lo
                 except ImportError:
                     st.caption("QR Code indisponível — use o código copia e cola acima.")
 
-                st.warning("Após pagar no aplicativo do seu banco, clique abaixo para registrar o pagamento na sua ficha.")
+                st.warning("Após pagar no aplicativo do seu banco, clique abaixo para registrar o pagamento.")
                 if st.button("✅ Confirmar Pagamento", type="primary", use_container_width=True):
                     # Re-verificar itens ainda em aberto para evitar lançamento duplicado
                     df_check = buscar_dados("""
@@ -757,22 +783,32 @@ if st.session_state.get('modo_obreiro') and not st.session_state.get('usuario_lo
                         mc = t['mes_competencia']
                         ja_pagos.add((meses_en_pt.get(mc, mc), _cat_key_ob(t['categoria'])))
 
+                    df_check_pend = buscar_dados("""
+                        SELECT mes_competencia, categoria FROM pagamentos_pendentes
+                        WHERE obreiro_id = %s AND ano_competencia = %s AND status = 'Aguardando'
+                    """, (int(row_ob['id']), ano_atual))
+                    for _, t in df_check_pend.iterrows():
+                        mc = t['mes_competencia']
+                        ja_pagos.add((meses_en_pt.get(mc, mc), _cat_key_ob(t['categoria'])))
+
                     hoje = date.today().strftime('%Y-%m-%d')
                     comandos = []
                     for _, item in selecionados.iterrows():
                         if (item['Mês'], item['Item']) in ja_pagos:
                             continue
                         comandos.append((
-                            "INSERT INTO transacoes (data, tipo, categoria, descricao, valor, obreiro_id, mes_competencia, ano_competencia, tipo_caixa) VALUES (%s, 'Entrada', %s, %s, %s, %s, %s, %s, 'Bancário')",
-                            (hoje, item['Item'],
-                             f"Entrada/{nome_sel}/{item['Item']}/{float(item['Valor']):.2f} (PIX Auto Atendimento)",
-                             float(item['Valor']), int(row_ob['id']), item['Mês'], ano_atual)
+                            "INSERT INTO pagamentos_pendentes (obreiro_id, mes_competencia, ano_competencia, categoria, valor, data_solicitacao, status) VALUES (%s, %s, %s, %s, %s, %s, 'Aguardando')",
+                            (int(row_ob['id']), item['Mês'], ano_atual, item['Item'], float(item['Valor']), hoje)
                         ))
 
                     if not comandos:
-                        st.error("Esses itens já constam como pagos.")
+                        st.error("Esses itens já constam como pagos ou aguardando aprovação.")
                     elif executar_lote(comandos):
-                        st.session_state['aa_sucesso'] = f"Pagamento registrado: {len(comandos)} item(ns) — {formatar_moeda(sum(c[1][3] for c in comandos))}"
+                        st.session_state['aa_sucesso'] = (
+                            f"Pagamento registrado ({len(comandos)} item(ns) — "
+                            f"{formatar_moeda(sum(c[1][4] for c in comandos))}). "
+                            "Envie o comprovante para o Tesoureiro dar baixa no seu pagamento."
+                        )
                         st.rerun()
 
     st.markdown("---")
@@ -1170,6 +1206,46 @@ elif modulo == "🏦 Conciliação Bancária":
             st.markdown("---")
     else:
         st.info("Nenhuma transação pendente. O caixa está atualizado com o banco.")
+
+    # Pagamentos PIX do Auto Atendimento aguardando baixa
+    st.write("### 💳 Pagamentos PIX — Auto Atendimento do Obreiro")
+    df_pix_pend = buscar_dados("""
+        SELECT p.id, p.categoria, p.mes_competencia, p.ano_competencia, p.valor,
+               p.data_solicitacao, p.obreiro_id, o.nome, o.cim
+        FROM pagamentos_pendentes p
+        JOIN obreiros o ON o.id = p.obreiro_id
+        WHERE p.status = 'Aguardando'
+        ORDER BY p.data_solicitacao, o.nome
+    """)
+
+    if not df_pix_pend.empty:
+        for _, p in df_pix_pend.iterrows():
+            col_p1, col_p2, col_p3 = st.columns([3, 3, 2])
+            with col_p1:
+                st.write(f"**{p['nome']}** (CIM: {p['cim']})")
+                st.write(f"{p['categoria']} — {p['mes_competencia']}/{p['ano_competencia']}")
+            with col_p2:
+                st.write(f"**Valor:** {formatar_moeda(p['valor'])}")
+                st.write(f"Informado em: {formatar_data(p['data_solicitacao'])}")
+            with col_p3:
+                if st.button("Dar Baixa", key=f"baixa_pix_{p['id']}", use_container_width=True):
+                    sucesso = executar_lote([
+                        ("INSERT INTO transacoes (data, tipo, categoria, descricao, valor, obreiro_id, mes_competencia, ano_competencia, tipo_caixa) VALUES (%s, 'Entrada', %s, %s, %s, %s, %s, %s, 'Bancário')",
+                         (p['data_solicitacao'], p['categoria'],
+                          f"Entrada/{p['nome']}/{p['categoria']}/{float(p['valor']):.2f} (PIX Auto Atendimento)",
+                          float(p['valor']), int(p['obreiro_id']), p['mes_competencia'], p['ano_competencia'])),
+                        ("UPDATE pagamentos_pendentes SET status = 'Aprovado' WHERE id = %s", (int(p['id']),))
+                    ])
+                    if sucesso:
+                        st.success("Baixa efetuada! Pagamento lançado na ficha do obreiro.")
+                        st.rerun()
+                if st.button("Recusar", key=f"recusa_pix_{p['id']}", use_container_width=True):
+                    if executar_comando("UPDATE pagamentos_pendentes SET status = 'Recusado' WHERE id = %s", (int(p['id']),)):
+                        st.warning("Pagamento recusado. O item voltou a ficar em aberto para o obreiro.")
+                        st.rerun()
+            st.markdown("---")
+    else:
+        st.info("Nenhum pagamento PIX aguardando aprovação.")
 
 # ==========================================
 # MÓDULO NOVO: RELATÓRIO DETALHADO

@@ -348,6 +348,34 @@ def init_db():
             )
         """)
     
+    # Tabela de Pagamentos Pendentes (Auto Atendimento PIX - aguarda baixa do tesoureiro)
+    if DB_TYPE == 'postgresql':
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS pagamentos_pendentes (
+                id SERIAL PRIMARY KEY,
+                obreiro_id INTEGER NOT NULL,
+                mes_competencia TEXT NOT NULL,
+                ano_competencia TEXT NOT NULL,
+                categoria TEXT NOT NULL,
+                valor REAL NOT NULL,
+                data_solicitacao TEXT NOT NULL,
+                status TEXT DEFAULT 'Aguardando'
+            )
+        """)
+    else:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS pagamentos_pendentes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                obreiro_id INTEGER NOT NULL,
+                mes_competencia TEXT NOT NULL,
+                ano_competencia TEXT NOT NULL,
+                categoria TEXT NOT NULL,
+                valor REAL NOT NULL,
+                data_solicitacao TEXT NOT NULL,
+                status TEXT DEFAULT 'Aguardando'
+            )
+        """)
+
     # Adicionando o vínculo na tabela de transações para evitar duplicidade no Livro Caixa (apenas SQLite)
     if DB_TYPE == 'sqlite':
         try:
