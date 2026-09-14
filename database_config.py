@@ -5,10 +5,20 @@ Sistema Financeiro - Loja Jerônimo Rosado 1994
 """
 import sqlite3
 import hashlib
+import numpy as np
 import pandas as pd
 from datetime import datetime, date
 import psycopg2
 from psycopg2 import sql
+from psycopg2.extensions import register_adapter, AsIs
+
+# psycopg2/sqlite3 não sabem adaptar tipos numpy vindos de DataFrames
+register_adapter(np.int64, lambda v: AsIs(int(v)))
+register_adapter(np.float64, lambda v: AsIs(float(v)))
+register_adapter(np.bool_, lambda v: AsIs(bool(v)))
+sqlite3.register_adapter(np.int64, int)
+sqlite3.register_adapter(np.float64, float)
+sqlite3.register_adapter(np.bool_, bool)
 
 # ==========================================
 # CONFIGURAÇÃO DO BANCO DE DADOS
