@@ -45,7 +45,16 @@ def get_connection():
         except ImportError:
             import os
             sslmode = os.getenv('POSTGRES_SSLMODE', 'require')
-        return psycopg2.connect(**POSTGRES_CONFIG, sslmode=sslmode)
+
+        # Tentar conectar sem SSL primeiro para debug
+        try:
+            return psycopg2.connect(**POSTGRES_CONFIG, sslmode=sslmode)
+        except Exception as e:
+            # Se falhar com SSL, tentar sem SSL
+            try:
+                return psycopg2.connect(**POSTGRES_CONFIG)
+            except Exception as e2:
+                raise Exception(f"Erro com SSL: {str(e)}\nErro sem SSL: {str(e2)}")
     else:
         return sqlite3.connect(DB_PATH)
 
