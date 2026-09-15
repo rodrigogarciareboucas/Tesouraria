@@ -263,6 +263,15 @@ if not st.session_state.get('usuario_logado') and not st.session_state.get('modo
         .watermark-1 { top: 10%; left: 5%; transform: rotate(-15deg); }
         .watermark-2 { bottom: 10%; right: 5%; transform: rotate(15deg); }
         .watermark-3 { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+
+        /* Ajustes para smartphone */
+        @media (max-width: 640px) {
+            .title { font-size: 1.6rem !important; }
+            .subtitle { font-size: 0.9rem; margin-bottom: 15px; }
+            .watermark { font-size: 60px; }
+            .login-container { padding: 5px 15px 25px 15px; }
+            .stTextInput>div>div>input { font-size: 16px; }
+        }
         </style>
     """, unsafe_allow_html=True)
     
@@ -378,6 +387,18 @@ st.markdown("""
     .metric-saldo { color: #3b82f6 !important; }
     /* Melhoria na Tabela */
     .stDataFrame { border: 1px solid #e2e8f0; border-radius: 8px; }
+
+    /* Ajustes para smartphone */
+    @media (max-width: 640px) {
+        h1 { font-size: 1.4rem !important; }
+        h2, h3 { font-size: 1.1rem !important; }
+        div[data-testid="stMetricValue"] { font-size: 1.2rem !important; }
+        div[data-testid="stMetricLabel"] { font-size: 0.75rem !important; }
+        .block-container { padding-left: 1rem; padding-right: 1rem; padding-top: 1rem; }
+        .stDataFrame { font-size: 0.8rem; }
+        /* Inputs com fonte >= 16px evitam zoom automático no iOS */
+        .stTextInput>div>div>input, .stNumberInput input { font-size: 16px; }
+    }
     </style>
 """, unsafe_allow_html=True)
 
