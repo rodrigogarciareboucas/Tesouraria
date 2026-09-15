@@ -287,12 +287,56 @@ if not st.session_state.get('usuario_logado') and not st.session_state.get('modo
     st.markdown('<h1 class="title">🏛️ Sistema Financeiro</h1>', unsafe_allow_html=True)
     st.markdown('<p class="subtitle">Loja Jerônimo Rosado 1994</p>', unsafe_allow_html=True)
     st.markdown("---")
-    
-    with st.form("login_form"):
-        email = st.text_input("📧 E-mail", placeholder="Digite seu e-mail")
-        senha = st.text_input("🔑 Senha", type="password", placeholder="Digite sua senha")
-        submit_button = st.form_submit_button("Entrar", use_container_width=True)
-    
+
+    col_obreiro, col_tesoureiro = st.columns(2, gap="large")
+
+    with col_obreiro:
+        with st.container(border=True):
+            st.markdown("### 💳 Área do Obreiro")
+            st.caption("Consulte suas mensalidades, pague via PIX e baixe sua ficha.")
+            with st.form("login_obreiro_page"):
+                cim_ob = st.text_input("🪪 CIM", placeholder="Somente números")
+                senha_ob = st.text_input("🔑 Senha", type="password", placeholder="Digite sua senha")
+                entrar_ob = st.form_submit_button("Entrar", use_container_width=True)
+            st.caption("Primeiro acesso? Use a senha inicial fornecida pela tesouraria.")
+
+    with col_tesoureiro:
+        with st.container(border=True):
+            st.markdown("### 🏛️ Acesso do Tesoureiro")
+            st.caption("Gestão financeira completa da loja.")
+            with st.form("login_form"):
+                email = st.text_input("📧 E-mail", placeholder="Digite seu e-mail")
+                senha = st.text_input("🔑 Senha", type="password", placeholder="Digite sua senha")
+                submit_button = st.form_submit_button("Entrar", use_container_width=True)
+
+    if entrar_ob:
+        if cim_ob and senha_ob:
+            df_login = buscar_dados(
+                "SELECT id, nome, senha, senha_alterada FROM obreiros WHERE cim = %s",
+                (cim_ob.strip(),))
+            if df_login.empty:
+                st.error("CIM não encontrado.")
+            else:
+                hash_in = hash_senha_obreiro(senha_ob)
+                candidatos = df_login[df_login['senha'].fillna('') == hash_in]
+                if candidatos.empty:
+                    st.error("Senha incorreta.")
+                elif len(candidatos) == 1:
+                    r = candidatos.iloc[0]
+                    st.session_state['modo_obreiro'] = True
+                    st.session_state['obreiro_id'] = int(r['id'])
+                    st.session_state['obreiro_trocar_senha'] = int(r['senha_alterada'] or 0) == 0
+                    st.rerun()
+                else:
+                    st.session_state['modo_obreiro'] = True
+                    st.session_state['obreiro_cands'] = {
+                        r['nome']: {'id': int(r['id']), 'senha_alterada': int(r['senha_alterada'] or 0)}
+                        for _, r in candidatos.iterrows()
+                    }
+                    st.rerun()
+        else:
+            st.error("Informe CIM e senha.")
+
     if submit_button:
         if email and senha:
             usuario, erro = verificar_login(email, senha)
@@ -308,13 +352,6 @@ if not st.session_state.get('usuario_logado') and not st.session_state.get('modo
                 st.error(erro)
         else:
             st.error("Preencha todos os campos.")
-
-    st.markdown("---")
-    st.markdown("### 💳 Área do Obreiro")
-    st.caption("Consulte suas mensalidades e pague via PIX — sem precisar de senha.")
-    if st.button("📱 Acessar Auto Atendimento", use_container_width=True):
-        st.session_state['modo_obreiro'] = True
-        st.rerun()
 
     st.markdown("---")
     st.markdown("""
