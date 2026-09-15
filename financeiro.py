@@ -375,12 +375,12 @@ if not st.session_state.get('usuario_logado') and not st.session_state.get('modo
 # Customização de cores para manter a identidade Azul-Escuro e Dourado
 st.markdown("""
     <style>
-    .main { background-color: #0f172a; color: #f8fafc; }
+    .main { background-color: var(--background-color); color: var(--text-color); }
     h1, h2, h3 { color: #d4af37 !important; font-family: 'Poppins', sans-serif; }
     .stButton>button { background-color: #d4af37; color: #001f3f; font-weight: bold; border-radius: 5px; }
     .stButton>button:hover { background-color: #001f3f; color: #d4af37; border: 1px solid #d4af37; }
-    div[data-testid="stMetricValue"] { color: #ffffff !important; }
-    div[data-testid="stMetricLabel"] { color: #94a3b8 !important; }
+    div[data-testid="stMetricValue"] { color: var(--text-color) !important; }
+    div[data-testid="stMetricLabel"] { color: var(--secondary-text-color, #94a3b8) !important; }
     /* Cores de status fixas */
     .metric-receita { color: #22c55e !important; }
     .metric-despesa { color: #ef4444 !important; }
