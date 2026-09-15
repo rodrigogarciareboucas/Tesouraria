@@ -1408,7 +1408,31 @@ elif modulo == "📈 Relatório Detalhado":
         df_rel['valor'] = pd.to_numeric(df_rel['valor'], errors='coerce').fillna(0.0)
         df_rel['data'] = pd.to_datetime(df_rel['data'])
         df_rel['mes_ano'] = df_rel['data'].dt.to_period('M')
-        
+        df_rel['tipo'] = df_rel['tipo'].astype(str).str.strip().replace('Saída', 'Saida')
+        df_rel['tipo_caixa'] = df_rel['tipo_caixa'].fillna('Bancário')
+
+        def _agg_categoria(df_cat, total_ref):
+            """Agrega por categoria: quantidade, total e % do total"""
+            agg = df_cat.groupby('categoria').agg(Qtde=('valor', 'size'), Total=('valor', 'sum'))
+            agg = agg.reset_index().sort_values('Total', ascending=False)
+            agg['%'] = agg['Total'].apply(lambda v: f"{(v / total_ref * 100):.1f}%" if total_ref else "-")
+            agg['Total'] = agg['Total'].apply(formatar_moeda)
+            return agg.rename(columns={'categoria': 'Categoria'})[['Categoria', 'Qtde', 'Total', '%']]
+
+        def _tabela_caixa(df_):
+            """Entradas, saídas e saldo por tipo de caixa"""
+            piv = df_.pivot_table(index='tipo_caixa', columns='tipo', values='valor',
+                                  aggfunc='sum', fill_value=0)
+            for c in ['Entrada', 'Saida']:
+                if c not in piv.columns:
+                    piv[c] = 0.0
+            piv['Saldo'] = piv['Entrada'] - piv['Saida']
+            df_cx = piv.reset_index().rename(columns={
+                'tipo_caixa': 'Caixa', 'Entrada': 'Entradas', 'Saida': 'Saídas'})
+            for c in ['Entradas', 'Saídas', 'Saldo']:
+                df_cx[c] = df_cx[c].apply(formatar_moeda)
+            return df_cx
+
         # Gerar relatório mês a mês
         st.markdown("---")
         st.write("### Relatório Mês a Mês")
@@ -1433,61 +1457,49 @@ elif modulo == "📈 Relatório Detalhado":
             mes_nome = f"{mes_portugues}/{mes_partes[1]}"
             
             with st.expander(f"📅 {mes_nome.upper()}"):
-                # Entradas por categoria
                 df_entradas_mes = df_mes[df_mes['tipo'] == 'Entrada']
-                if not df_entradas_mes.empty:
-                    st.markdown('<div class="relatorio-container">', unsafe_allow_html=True)
-                    st.markdown('<h3 style="color: #d4af37; margin-bottom: 15px;">💰 Entradas por Categoria</h3>', unsafe_allow_html=True)
-                    
-                    # Mostrar tabela com todos os lançamentos
-                    df_entradas_display = df_entradas_mes[['data', 'categoria', 'descricao', 'valor']].copy()
-                    df_entradas_display['data'] = df_entradas_display['data'].apply(formatar_data)
-                    df_entradas_display['valor'] = df_entradas_display['valor'].apply(formatar_moeda)
-                    df_entradas_display.columns = ['Data', 'Categoria', 'Descrição', 'Valor']
-                    st.dataframe(df_entradas_display, use_container_width=True, hide_index=True)
-                    
-                    total_entradas = df_entradas_mes['valor'].sum()
-                    col_entradas = st.columns([1, 2, 1])
-                    with col_entradas[1]:
-                        st.metric("Total Entradas", formatar_moeda(total_entradas))
-                    st.markdown('</div>', unsafe_allow_html=True)
-                else:
-                    st.info("Nenhuma entrada neste mês")
-                
-                st.markdown("---")
-                
-                # Saídas por categoria
-                df_saidas_mes = df_mes[df_mes['tipo'].isin(['Saída', 'Saida'])]
-                if not df_saidas_mes.empty:
-                    st.markdown('<div class="relatorio-container">', unsafe_allow_html=True)
-                    st.markdown('<h3 style="color: #d4af37; margin-bottom: 15px;">💸 Saídas por Categoria</h3>', unsafe_allow_html=True)
-                    
-                    # Mostrar tabela com todos os lançamentos
-                    df_saidas_display = df_saidas_mes[['data', 'categoria', 'descricao', 'valor']].copy()
-                    df_saidas_display['data'] = df_saidas_display['data'].apply(formatar_data)
-                    df_saidas_display['valor'] = df_saidas_display['valor'].apply(formatar_moeda)
-                    df_saidas_display.columns = ['Data', 'Categoria', 'Descrição', 'Valor']
-                    st.dataframe(df_saidas_display, use_container_width=True, hide_index=True)
-                    
-                    total_saidas = df_saidas_mes['valor'].sum()
-                    col_saidas = st.columns([1, 2, 1])
-                    with col_saidas[1]:
-                        st.metric("Total Saídas", formatar_moeda(total_saidas))
-                    st.markdown('</div>', unsafe_allow_html=True)
-                else:
-                    st.info("Nenhuma saída neste mês")
-                
-                st.markdown("---")
-                
-                # Saldo do mês
-                st.markdown('<div class="relatorio-container">', unsafe_allow_html=True)
-                st.markdown('<h3 style="color: #d4af37; margin-bottom: 15px;">⚖️ Saldo do Mês</h3>', unsafe_allow_html=True)
-                saldo_mes = total_entradas - total_saidas if not df_entradas_mes.empty and not df_saidas_mes.empty else (total_entradas if not df_entradas_mes.empty else -total_saidas)
-                col_saldo = st.columns([1, 2, 1])
-                with col_saldo[1]:
-                    st.metric("Saldo do Mês", formatar_moeda(saldo_mes), delta_color="normal" if saldo_mes >= 0 else "inverse")
-                st.markdown('</div>', unsafe_allow_html=True)
-                
+                df_saidas_mes = df_mes[df_mes['tipo'] == 'Saida']
+                total_entradas = float(df_entradas_mes['valor'].sum())
+                total_saidas = float(df_saidas_mes['valor'].sum())
+                saldo_mes = total_entradas - total_saidas
+
+                # KPIs do mês
+                k1, k2, k3, k4 = st.columns(4)
+                k1.metric("Entradas", formatar_moeda(total_entradas))
+                k2.metric("Saídas", formatar_moeda(total_saidas))
+                k3.metric("Saldo", formatar_moeda(saldo_mes),
+                          delta=formatar_moeda(saldo_mes),
+                          delta_color="normal" if saldo_mes >= 0 else "inverse")
+                k4.metric("Lançamentos", len(df_mes))
+
+                col_e, col_s = st.columns(2)
+                with col_e:
+                    st.markdown("**💰 Entradas por Categoria**")
+                    if not df_entradas_mes.empty:
+                        st.dataframe(_agg_categoria(df_entradas_mes, total_entradas),
+                                     hide_index=True, use_container_width=True)
+                    else:
+                        st.info("Nenhuma entrada neste mês")
+                with col_s:
+                    st.markdown("**💸 Saídas por Categoria**")
+                    if not df_saidas_mes.empty:
+                        st.dataframe(_agg_categoria(df_saidas_mes, total_saidas),
+                                     hide_index=True, use_container_width=True)
+                    else:
+                        st.info("Nenhuma saída neste mês")
+
+                # Movimento por tipo de caixa
+                st.markdown("**🏦 Movimento por Tipo de Caixa**")
+                st.dataframe(_tabela_caixa(df_mes), hide_index=True, use_container_width=True)
+
+                # Lançamentos detalhados (recolhido por padrão)
+                with st.expander("📜 Ver lançamentos detalhados"):
+                    df_det = df_mes[['data', 'tipo', 'categoria', 'descricao', 'tipo_caixa', 'valor']].copy()
+                    df_det['data'] = df_det['data'].apply(formatar_data)
+                    df_det['valor'] = df_det['valor'].apply(formatar_moeda)
+                    df_det.columns = ['Data', 'Tipo', 'Categoria', 'Descrição', 'Caixa', 'Valor']
+                    st.dataframe(df_det, use_container_width=True, hide_index=True)
+
                 # Adicionar ao relatório completo para exportação
                 for _, row in df_entradas_mes.iterrows():
                     relatorio_completo.append({
@@ -1509,7 +1521,44 @@ elif modulo == "📈 Relatório Detalhado":
                         'Valor': row['valor'],
                         'Caixa': row['tipo_caixa']
                     })
-        
+
+        # Resumo consolidado de todo o período selecionado
+        st.markdown("---")
+        st.write("### 📌 Resumo Geral do Período")
+
+        df_ent_per = df_rel[df_rel['tipo'] == 'Entrada']
+        df_sai_per = df_rel[df_rel['tipo'] == 'Saida']
+        tot_e = float(df_ent_per['valor'].sum())
+        tot_s = float(df_sai_per['valor'].sum())
+        saldo_per = tot_e - tot_s
+
+        g1, g2, g3, g4 = st.columns(4)
+        g1.metric("Total Entradas", formatar_moeda(tot_e))
+        g2.metric("Total Saídas", formatar_moeda(tot_s))
+        g3.metric("Saldo do Período", formatar_moeda(saldo_per),
+                  delta=formatar_moeda(saldo_per),
+                  delta_color="normal" if saldo_per >= 0 else "inverse")
+        g4.metric("Lançamentos", len(df_rel))
+
+        col_ge, col_gs = st.columns(2)
+        with col_ge:
+            st.markdown("**💰 Entradas por Categoria (período)**")
+            if not df_ent_per.empty:
+                st.dataframe(_agg_categoria(df_ent_per, tot_e),
+                             hide_index=True, use_container_width=True)
+            else:
+                st.info("Sem entradas no período")
+        with col_gs:
+            st.markdown("**💸 Saídas por Categoria (período)**")
+            if not df_sai_per.empty:
+                st.dataframe(_agg_categoria(df_sai_per, tot_s),
+                             hide_index=True, use_container_width=True)
+            else:
+                st.info("Sem saídas no período")
+
+        st.markdown("**🏦 Por Tipo de Caixa (período)**")
+        st.dataframe(_tabela_caixa(df_rel), hide_index=True, use_container_width=True)
+
         # Exportar relatório completo em PDF
         st.markdown("---")
         st.write("### Exportar Relatório Completo")
@@ -1543,7 +1592,49 @@ elif modulo == "📈 Relatório Detalhado":
             pdf.set_line_width(0.5)
             pdf.line(20, 45, 190, 45)
             pdf.ln(10)
-            
+
+            # Resumo por categoria no período
+            def agg_pdf_cat(tipo):
+                d = {}
+                for it in relatorio:
+                    if it['Tipo'] == tipo:
+                        d[it['Categoria']] = d.get(it['Categoria'], 0) + it['Valor']
+                return sorted(d.items(), key=lambda x: -x[1])
+
+            pdf.set_text_color(30, 58, 95)
+            pdf.set_font('Arial', 'B', 12)
+            pdf.cell(0, 8, 'RESUMO POR CATEGORIA', 0, 1, 'L')
+            pdf.ln(2)
+
+            for tipo_label, tipo_key in (('ENTRADAS', 'Entrada'), ('SAIDAS', 'Saída')):
+                agg = agg_pdf_cat(tipo_key)
+                pdf.set_text_color(212, 175, 55)
+                pdf.set_font('Arial', 'B', 10)
+                pdf.cell(0, 7, tipo_label, 0, 1, 'L')
+                if agg:
+                    pdf.set_fill_color(212, 175, 55)
+                    pdf.set_text_color(30, 58, 95)
+                    pdf.set_font('Arial', 'B', 9)
+                    pdf.cell(120, 6, 'Categoria', 0, 0, 'L', True)
+                    pdf.cell(40, 6, 'Total', 0, 1, 'R', True)
+                    pdf.set_text_color(0, 0, 0)
+                    pdf.set_font('Arial', '', 9)
+                    total_t = 0
+                    for cat, val in agg:
+                        total_t += val
+                        pdf.cell(120, 5, str(cat)[:50], 0, 0, 'L')
+                        pdf.cell(40, 5, f'R$ {val:.2f}', 0, 1, 'R')
+                    pdf.set_font('Arial', 'B', 9)
+                    pdf.cell(120, 6, 'Total', 0, 0, 'L')
+                    pdf.cell(40, 6, f'R$ {total_t:.2f}', 0, 1, 'R')
+                else:
+                    pdf.set_text_color(148, 163, 184)
+                    pdf.set_font('Arial', '', 9)
+                    pdf.cell(0, 6, 'Nenhum lancamento', 0, 1, 'L')
+                pdf.ln(4)
+
+            pdf.ln(6)
+
             # Agrupar por mês
             meses = sorted(set(item['Mês'] for item in relatorio))
             
