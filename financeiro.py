@@ -799,8 +799,21 @@ if st.session_state.get('modo_obreiro') and not st.session_state.get('usuario_lo
             mes_c = meses_en_pt[mes_c]
         pendentes.add((mes_c, _cat_key_ob(t['categoria'])))
 
+    # Meses com isenção pontual (afastamento retroativo etc.)
+    df_isenc = buscar_dados("""
+        SELECT mes_competencia FROM isencoes
+        WHERE obreiro_id = %s AND ano_competencia = %s
+    """, (int(row_ob['id']), ano_atual))
+    meses_isentos = set()
+    for _, t in df_isenc.iterrows():
+        mes_c = t['mes_competencia']
+        if mes_c in meses_en_pt:
+            mes_c = meses_en_pt[mes_c]
+        meses_isentos.add(mes_c)
+
     valor_mensal = float(row_ob['valor_mensalidade'])
     isento = int(row_ob['isento'] or 0) == 1
+    afastado = int(row_ob.get('afastado', 0) or 0) == 1
 
     linhas_ficha = []
     for m in MESES_AA:
@@ -808,6 +821,10 @@ if st.session_state.get('modo_obreiro') and not st.session_state.get('usuario_lo
         quitado = valor_mensal > 0 and pago >= valor_mensal
         if quitado:
             situacao = 'Quitado'
+        elif afastado:
+            situacao = 'Afastado'
+        elif m in meses_isentos:
+            situacao = 'Isento'
         elif (m, 'Mensalidade Loja') in pendentes:
             situacao = 'Aguardando aprovação'
         else:
@@ -822,7 +839,9 @@ if st.session_state.get('modo_obreiro') and not st.session_state.get('usuario_lo
     st.write(f"### 📋 Suas Mensalidades — {ano_atual}")
     st.dataframe(pd.DataFrame(linhas_ficha), use_container_width=True)
 
-    if isento:
+    if afastado:
+        st.info("Você está afastado (situação aceita pelo GOB). Mensalidades suspensas até seu retorno.")
+    elif isento:
         st.info("Você está isento de mensalidades.")
     else:
         st.markdown("---")
@@ -837,7 +856,7 @@ if st.session_state.get('modo_obreiro') and not st.session_state.get('usuario_lo
 
         itens = []
         for m in MESES_AA:
-            if pagos.get((m, 'Mensalidade Loja'), 0.0) < valor_mensal and (m, 'Mensalidade Loja') not in pendentes:
+            if m not in meses_isentos and pagos.get((m, 'Mensalidade Loja'), 0.0) < valor_mensal and (m, 'Mensalidade Loja') not in pendentes:
                 itens.append({'Pagar': False, 'Mês': m, 'Item': 'Mensalidade Loja', 'Valor': valor_mensal})
             for cat_nome, cat_valor in TAXAS_PADRAO:
                 if (m, cat_nome) not in pagos and (m, cat_nome) not in pendentes:
@@ -1821,7 +1840,7 @@ elif modulo == "📈 Relatório Detalhado":
 elif modulo == "💳 Carteira de Obreiros (Mensalidades)":
     st.subheader("Ficha Financeira de Obreiros e Inadimplencia")
     
-    aba_status, aba_baixa, aba_inad = st.tabs(["Situacao de Regularidade", "Baixa Completa", "Relatorio de Inadimplencia"])
+    aba_status, aba_baixa, aba_inad = st.tabs(["Situacao de Regularidade", "Baixa Completa", "Relatorio de Pagamentos"])
     
     with aba_status:
         st.write("### Consultar Ficha do Obreiro")
@@ -1926,88 +1945,226 @@ elif modulo == "💳 Carteira de Obreiros (Mensalidades)":
                         st.rerun()
 
     with aba_inad:
-        st.write("### Auditoria de Inadimplencia")
-        periodo_sel = st.selectbox("Filtrar por:", ["Ultimos 3 meses", "Ultimos 6 meses", "1 ano"])
-        
-        if st.button("Gerar Relatorio de Inadimplencia"):
-            hoje = date.today()
-            
-            # Definir número de meses para verificação
-            if "3 meses" in periodo_sel:
-                meses_verificar = 3
-            elif "6 meses" in periodo_sel:
-                meses_verificar = 6
-            else:
-                meses_verificar = 12
-            
-            # Buscar obreiros não isentos
-            df_obreiros = buscar_dados("SELECT id, nome, cim FROM obreiros WHERE isento = 0")
-            
-            inadimplentes = []
-            
-            for _, row_obreiro in df_obreiros.iterrows():
-                obreiro_id = row_obreiro['id']
-                obreiro_nome = row_obreiro['nome']
-                
-                # Buscar a última mensalidade paga - lógica híbrida
-                conn = get_connection()
-                cursor = conn.cursor()
-                
-                # Tentar primeiro por obreiro_id
-                query_ultima_id = """
-                    SELECT MAX(data)
-                    FROM transacoes
-                    WHERE obreiro_id = %s
-                    AND descricao LIKE '%Mensalidade Loja%'
-                """
-                cursor.execute(query_ultima_id, (obreiro_id,))
-                resultado = cursor.fetchone()
-                
-                # Se não encontrar por ID, tentar por nome na descrição
-                if not resultado or not resultado[0]:
-                    query_ultima_nome = """
-                        SELECT MAX(data)
-                        FROM transacoes
-                        WHERE descricao LIKE %s
-                        AND descricao LIKE '%Mensalidade Loja%'
-                    """
-                    cursor.execute(query_ultima_nome, (f'%{obreiro_nome}%',))
-                    resultado = cursor.fetchone()
-                
-                conn.close()
-                
-                if resultado and resultado[0]:
-                    ultima_data = resultado[0]
-                    # Converter string de data para objeto date
-                    if isinstance(ultima_data, str):
-                        ultima_data = datetime.strptime(ultima_data, '%Y-%m-%d').date()
-                    
-                    # Calcular meses desde a última mensalidade
-                    meses_desde_pagamento = (hoje.year - ultima_data.year) * 12 + (hoje.month - ultima_data.month)
-                    
-                    # Se a última mensalidade foi há mais meses que o período selecionado
-                    if meses_desde_pagamento >= meses_verificar:
-                        inadimplentes.append({
-                            'nome': row_obreiro['nome'],
-                            'cim': row_obreiro['cim'],
-                            'ultima_mensalidade': ultima_data.strftime('%d/%m/%Y'),
-                            'meses_atraso': meses_desde_pagamento
-                        })
+        st.write("### 📋 Relatório de Pagamentos e Inadimplência")
+
+        # Valores mensais de referência (taxas valem para todos os obreiros, inclusive isentos)
+        TAXAS_MENSAIS = {
+            "Auxilio Funeral (PAF)": 10.84,   # R$ 130,00/ano
+            "Anuidade GOB Federal": 17.50,    # R$ 210,00/ano
+            "Anuidade GOB RN": 28.17,         # R$ 338,00/ano
+        }
+        VALOR_MENS_REF = 162.00
+
+        hoje = date.today()
+        col_f1, col_f2, col_f3 = st.columns(3)
+        with col_f1:
+            ano_rel = st.selectbox("Ano", ANOS, index=0, key="inad_ano")
+        with col_f2:
+            mes_padrao = hoje.month if int(ano_rel) == hoje.year else (12 if int(ano_rel) < hoje.year else 1)
+            mes_limite = st.selectbox("Apurar até o mês", MESES, index=mes_padrao - 1, key="inad_mes")
+        with col_f3:
+            filtro_sit = st.selectbox("Exibir", ["Todos", "Somente devedores", "Somente em dia"], key="inad_filtro")
+
+        n_meses = MESES.index(mes_limite) + 1
+        meses_ate = MESES[:n_meses]
+
+        df_obr = buscar_dados("SELECT id, nome, cim, isento, afastado, valor_mensalidade FROM obreiros ORDER BY nome")
+        df_pag = buscar_dados(
+            "SELECT obreiro_id, categoria, mes_competencia, SUM(valor) AS valor FROM transacoes "
+            "WHERE tipo = 'Entrada' AND obreiro_id IS NOT NULL AND ano_competencia = %s "
+            "GROUP BY obreiro_id, categoria, mes_competencia", (ano_rel,))
+        df_pend = buscar_dados(
+            "SELECT obreiro_id, categoria, mes_competencia, SUM(valor) AS valor FROM pagamentos_pendentes "
+            "WHERE status = 'Aguardando' AND ano_competencia = %s "
+            "GROUP BY obreiro_id, categoria, mes_competencia", (ano_rel,))
+        df_isenc = buscar_dados(
+            "SELECT obreiro_id, mes_competencia FROM isencoes WHERE ano_competencia = %s", (ano_rel,))
+        isencoes_set = set()
+        for _, r in df_isenc.iterrows():
+            isencoes_set.add((int(r['obreiro_id']), r['mes_competencia']))
+
+        if df_obr.empty:
+            st.info("Nenhum obreiro cadastrado.")
+        else:
+            # Mapas de consulta rápida
+            pago = {}
+            for _, r in df_pag.iterrows():
+                pago[(int(r['obreiro_id']), r['categoria'], r['mes_competencia'])] = float(r['valor'])
+            pend = {}
+            for _, r in df_pend.iterrows():
+                pend[(int(r['obreiro_id']), r['categoria'], r['mes_competencia'])] = float(r['valor'])
+
+            def recebido_categoria(cat, meses):
+                return sum(v for (oid, c, m), v in pago.items() if c == cat and m in meses)
+
+            n_total = len(df_obr)
+            # Pagantes: não isentos e não afastados
+            ids_pagantes = set()
+            for _, o in df_obr.iterrows():
+                if int(o['isento'] or 0) != 1 and int(o['afastado'] or 0) != 1 and float(o['valor_mensalidade'] or 0) > 0:
+                    ids_pagantes.add(int(o['id']))
+            n_pagantes = len(ids_pagantes)
+
+            # ============ RECEITA ESPERADA x RECEBIDA POR CATEGORIA ============
+            st.markdown("#### 💰 Receita Esperada x Recebida por Categoria")
+            linhas_cat = []
+
+            def linha_cat(nome, ref_txt, base_txt, esp_mes, esp_acum=None):
+                rec = recebido_categoria(nome, meses_ate)
+                if esp_acum is None:
+                    esp_acum = esp_mes * n_meses
+                falta = max(0.0, esp_acum - rec)
+                pct = (rec / esp_acum * 100) if esp_acum > 0 else 0
+                linhas_cat.append({
+                    "Categoria": nome, "Ref. mensal": ref_txt, "Base": base_txt,
+                    "Esperado no mês": formatar_moeda(esp_mes),
+                    "Esperado acum.": formatar_moeda(esp_acum),
+                    "Recebido": formatar_moeda(rec),
+                    "Falta": formatar_moeda(falta),
+                    "% arrecadado": f"{pct:.0f}%"
+                })
+                return esp_acum, rec
+
+            # Mensalidade esperada desconta as isenções pontuais de cada mês
+            eximidos_mes = {m: sum(1 for (o, mm) in isencoes_set if mm == m and o in ids_pagantes) for m in meses_ate}
+            esp_mes_mens = (n_pagantes - eximidos_mes.get(mes_limite, 0)) * VALOR_MENS_REF
+            esp_acum_mens = sum((n_pagantes - eximidos_mes.get(m, 0)) * VALOR_MENS_REF for m in meses_ate)
+            esp_mens_total, rec_mens_total = linha_cat(
+                "Mensalidade Loja", formatar_moeda(VALOR_MENS_REF),
+                f"{n_pagantes} não isentos/afastados", esp_mes_mens, esp_acum_mens)
+            esp_tax_total, rec_tax_total = 0.0, 0.0
+            for cat, val in TAXAS_MENSAIS.items():
+                e, r = linha_cat(cat, formatar_moeda(val), f"{n_total} obreiros", n_total * val)
+                esp_tax_total += e
+                rec_tax_total += r
+
+            esp_total = esp_mens_total + esp_tax_total
+            rec_total = rec_mens_total + rec_tax_total
+            falta_total = max(0.0, esp_total - rec_total)
+            linhas_cat.append({
+                "Categoria": "**TOTAL**", "Ref. mensal": "—", "Base": "—",
+                "Esperado no mês": formatar_moeda(esp_total / n_meses),
+                "Esperado acum.": formatar_moeda(esp_total),
+                "Recebido": formatar_moeda(rec_total),
+                "Falta": formatar_moeda(falta_total),
+                "% arrecadado": f"{(rec_total / esp_total * 100) if esp_total else 0:.0f}%"
+            })
+            st.dataframe(pd.DataFrame(linhas_cat), use_container_width=True, hide_index=True)
+            st.caption("Mensalidade esperada = obreiros não isentos × R$ 162,00. Taxas (PAF, GOB Federal, GOB RN) são devidas por todos os obreiros, inclusive isentos.")
+
+            # ============ APURAÇÃO POR OBREIRO ============
+            detalhes = []
+            grade_linhas = {}
+            total_taxa_mes = sum(TAXAS_MENSAIS.values())
+
+            for _, obr in df_obr.iterrows():
+                oid = int(obr['id'])
+                isento = int(obr['isento'] or 0) == 1
+                afastado = int(obr['afastado'] or 0) == 1
+                val_mens_obr = float(obr['valor_mensalidade'] or 0)
+                eximidos_obr = {m for (o, m) in isencoes_set if o == oid and m in meses_ate}
+
+                rec_mens = sum(pago.get((oid, 'Mensalidade Loja', m), 0.0) for m in meses_ate)
+                rec_tax = sum(pago.get((oid, c, m), 0.0) for c in TAXAS_MENSAIS for m in meses_ate)
+                pend_total = sum(v for (o, c, m), v in pend.items() if o == oid and m in meses_ate)
+
+                n_meses_devidos = n_meses - len(eximidos_obr)
+                esp_mens_obr = 0.0 if (isento or afastado or val_mens_obr <= 0) else val_mens_obr * n_meses_devidos
+                esp_tax_obr = total_taxa_mes * n_meses
+
+                dev_mens = max(0.0, esp_mens_obr - rec_mens)
+                dev_tax = max(0.0, esp_tax_obr - rec_tax)
+                dev_total = dev_mens + dev_tax
+
+                meses_abertos = []
+                for m in meses_ate:
+                    if isento or afastado or val_mens_obr <= 0 or m in eximidos_obr:
+                        continue
+                    if pago.get((oid, 'Mensalidade Loja', m), 0) > 0:
+                        continue
+                    if (oid, 'Mensalidade Loja', m) not in pend:
+                        meses_abertos.append(m[:3])
+
+                if afastado:
+                    situacao = "🛌 Afastado"
+                elif isento:
+                    situacao = "🕊️ Isento"
+                elif dev_total <= 0.01:
+                    situacao = "✅ Em dia"
                 else:
-                    # Nunca pagou mensalidade
-                    inadimplentes.append({
-                        'nome': row_obreiro['nome'],
-                        'cim': row_obreiro['cim'],
-                        'ultima_mensalidade': 'Nunca pagou',
-                        'meses_atraso': 999
-                    })
-            
-            if inadimplentes:
-                df_inad = pd.DataFrame(inadimplentes)
-                st.dataframe(df_inad, use_container_width=True)
-                st.warning(f"Encontrados {len(inadimplentes)} inadimplentes no período (última mensalidade há mais de {meses_verificar} meses).")
-            else:
-                st.success("Nenhum inadimplente encontrado (Isentos ignorados).")
+                    situacao = "❌ Devedor"
+
+                detalhes.append({
+                    "Obreiro": obr['nome'], "CIM": obr['cim'], "Situação": situacao,
+                    "Devido Mensalidade": dev_mens, "Devido Taxas": dev_tax,
+                    "Aguard. aprovação": pend_total, "Devido Total": dev_total,
+                    "Meses em aberto": ", ".join(meses_abertos) if meses_abertos else "—"
+                })
+
+                # Grade mensalidade mês a mês
+                celulas = {}
+                for m in meses_ate:
+                    if isento or afastado or val_mens_obr <= 0:
+                        celulas[m[:3]] = "—"
+                    elif m in eximidos_obr:
+                        celulas[m[:3]] = "🕊️"
+                    elif pago.get((oid, 'Mensalidade Loja', m), 0) > 0:
+                        celulas[m[:3]] = "✅"
+                    elif (oid, 'Mensalidade Loja', m) in pend:
+                        celulas[m[:3]] = "⏳"
+                    else:
+                        celulas[m[:3]] = "❌"
+                grade_linhas[obr['nome']] = celulas
+
+            # ============ KPIs ============
+            n_em_dia = sum(1 for d in detalhes if "Em dia" in d["Situação"])
+            n_devedores = sum(1 for d in detalhes if "Devedor" in d["Situação"])
+            k1, k2, k3, k4, k5 = st.columns(5)
+            k1.metric("Esperado (Jan–" + mes_limite[:3] + ")", formatar_moeda(esp_total))
+            k2.metric("Recebido", formatar_moeda(rec_total))
+            k3.metric("Falta receber", formatar_moeda(falta_total))
+            k4.metric("Obreiros em dia", f"{n_em_dia}/{n_total}")
+            k5.metric("Devedores", n_devedores)
+
+            # ============ GRADE MENSALIDADES ============
+            st.markdown("#### 🗓️ Mensalidade Loja — mês a mês")
+            df_grade = pd.DataFrame.from_dict(grade_linhas, orient='index')
+            df_grade.index.name = "Obreiro"
+            st.dataframe(df_grade, use_container_width=True)
+            st.caption("✅ Pago  •  ⏳ Aguardando aprovação do tesoureiro  •  ❌ Em aberto  •  🕊️ Isento no mês  •  — Isento/Afastado/sem mensalidade")
+
+            # ============ LISTA DETALHADA ============
+            st.markdown("#### 📄 Situação individual")
+            df_det = pd.DataFrame(detalhes).sort_values("Devido Total", ascending=False)
+            if filtro_sit == "Somente devedores":
+                df_det = df_det[df_det["Situação"].str.contains("Devedor")]
+            elif filtro_sit == "Somente em dia":
+                df_det = df_det[df_det["Situação"].str.contains("Em dia")]
+
+            df_det_view = df_det.copy()
+            for c in ["Devido Mensalidade", "Devido Taxas", "Aguard. aprovação", "Devido Total"]:
+                df_det_view[c] = df_det_view[c].apply(formatar_moeda)
+            st.dataframe(df_det_view, use_container_width=True, hide_index=True)
+
+            csv = df_det.to_csv(index=False).encode('utf-8-sig')
+            st.download_button("📥 Baixar lista (CSV)", csv,
+                f"inadimplencia_{ano_rel}_ate_{mes_limite}.csv", "text/csv")
+
+            # ============ QUEM PAGOU ============
+            with st.expander("🧾 Ver quem pagou em um mês específico"):
+                mes_consulta = st.selectbox("Mês", meses_ate, index=len(meses_ate) - 1, key="inad_quem")
+                linhas_qp = []
+                nomes = dict(zip(df_obr['id'], df_obr['nome']))
+                for (oid, cat, m), v in pago.items():
+                    if m == mes_consulta:
+                        linhas_qp.append({"Obreiro": nomes.get(oid, f"ID {oid}"),
+                                          "Categoria": cat, "Valor": formatar_moeda(v)})
+                if linhas_qp:
+                    df_qp = pd.DataFrame(linhas_qp).sort_values(["Obreiro", "Categoria"])
+                    st.dataframe(df_qp, use_container_width=True, hide_index=True)
+                    st.caption(f"{df_qp['Obreiro'].nunique()} obreiro(s) com pagamento em {mes_consulta}/{ano_rel}.")
+                else:
+                    st.info(f"Nenhum pagamento registrado em {mes_consulta}/{ano_rel}.")
                 
 # ==========================================
 # MÓDULO 4: CONFIGURAÇÕES (CADASTRO, EDIÇÃO E EXCLUSÃO)
@@ -2032,7 +2189,7 @@ elif modulo == "👤 Cadastro de Obreiros":
     st.subheader("Gerenciar Quadro de Obreiros")
     
     # Adicionado o campo 'isento' na busca
-    df_membros = buscar_dados("SELECT id, nome, cim, grau, valor_mensalidade, isento FROM obreiros ORDER BY nome")
+    df_membros = buscar_dados("SELECT id, nome, cim, grau, valor_mensalidade, isento, afastado FROM obreiros ORDER BY nome")
     
     if not df_membros.empty:
         opcoes_membros = {f"{row['nome']} (CIM: {row['cim']})": row for _, row in df_membros.iterrows()}
@@ -2052,14 +2209,17 @@ elif modulo == "👤 Cadastro de Obreiros":
                     novo_valor = st.number_input("Mensalidade Fixa", value=float(dados_atuais['valor_mensalidade']))
                     # Adicionado checkbox de edição com o valor salvo no banco
                     novo_isento = st.checkbox("Obreiro Isento de Pagamento", value=bool(dados_atuais['isento']))
+                    novo_afastado = st.checkbox("Afastamento (doença ou motivo aceito pelo GOB)",
+                                                value=bool(dados_atuais.get('afastado', 0)),
+                                                help="Enquanto marcado, o obreiro fica isento de mensalidades até o retorno.")
                     
                     if st.form_submit_button("Salvar Alteracoes"):
-                        # Corrigido: Incluído isento no UPDATE
+                        # Corrigido: Incluído isento e afastado no UPDATE
                         executar_comando("""
                             UPDATE obreiros
-                            SET nome = %s, cim = %s, grau = %s, valor_mensalidade = %s, isento = %s
+                            SET nome = %s, cim = %s, grau = %s, valor_mensalidade = %s, isento = %s, afastado = %s
                             WHERE id = %s
-                        """, (novo_nome, novo_cim, novo_grau, novo_valor, int(novo_isento), int(dados_atuais['id'])))
+                        """, (novo_nome, novo_cim, novo_grau, novo_valor, int(novo_isento), int(novo_afastado), int(dados_atuais['id'])))
                         st.success(f"Dados de {novo_nome} atualizados com sucesso!")
                         st.rerun()
                         
@@ -2087,7 +2247,7 @@ elif modulo == "👤 Cadastro de Obreiros":
     colunas_existentes = df_colunas['name'].tolist() if not df_colunas.empty else []
     
     # Construir query dinâmica baseada nas colunas existentes
-    colunas_desejadas = ['id', 'nome', 'cim', 'grau', 'valor_mensalidade', 'isento', 'data_admissao']
+    colunas_desejadas = ['id', 'nome', 'cim', 'grau', 'valor_mensalidade', 'isento', 'afastado', 'data_admissao']
     colunas_opcionais = ['data_nascimento', 'email', 'telefone']
     
     # Adicionar apenas colunas que existem
@@ -2106,6 +2266,8 @@ elif modulo == "👤 Cadastro de Obreiros":
         # Mostrar tabela completa
         df_visualizacao = df_relatorio_obreiros.copy()
         df_visualizacao['isento'] = df_visualizacao['isento'].apply(lambda x: 'Sim' if x == 1 else 'Não')
+        if 'afastado' in df_visualizacao.columns:
+            df_visualizacao['afastado'] = df_visualizacao['afastado'].apply(lambda x: 'Sim' if x == 1 else 'Não')
         df_visualizacao['valor_mensalidade'] = df_visualizacao['valor_mensalidade'].apply(formatar_moeda)
         df_visualizacao['data_admissao'] = df_visualizacao['data_admissao'].apply(formatar_data)
         
@@ -2125,6 +2287,7 @@ elif modulo == "👤 Cadastro de Obreiros":
             'grau': 'Grau',
             'valor_mensalidade': 'Mensalidade',
             'isento': 'Isento',
+            'afastado': 'Afastado',
             'data_admissao': 'Data Admissão'
         }
         
@@ -2147,6 +2310,8 @@ elif modulo == "👤 Cadastro de Obreiros":
         # Preparar dados para exportação
         df_export = df_relatorio_obreiros.copy()
         df_export['isento'] = df_export['isento'].apply(lambda x: 'Sim' if x == 1 else 'Não')
+        if 'afastado' in df_export.columns:
+            df_export['afastado'] = df_export['afastado'].apply(lambda x: 'Sim' if x == 1 else 'Não')
         
         # Renomear colunas para exportação
         colunas_export = {
@@ -2156,6 +2321,7 @@ elif modulo == "👤 Cadastro de Obreiros":
             'grau': 'Grau',
             'valor_mensalidade': 'Mensalidade',
             'isento': 'Isento',
+            'afastado': 'Afastado',
             'data_admissao': 'Data Admissão'
         }
         
@@ -2183,14 +2349,17 @@ elif modulo == "👤 Cadastro de Obreiros":
         
         total_obreiros = len(df_relatorio_obreiros)
         total_isentos = df_relatorio_obreiros['isento'].sum()
-        total_pagantes = total_obreiros - total_isentos
-        receita_mensal_potencial = df_relatorio_obreiros[df_relatorio_obreiros['isento'] == 0]['valor_mensalidade'].sum()
+        total_afastados = df_relatorio_obreiros['afastado'].sum() if 'afastado' in df_relatorio_obreiros.columns else 0
+        nao_pagantes = (df_relatorio_obreiros['isento'] == 1) | (df_relatorio_obreiros.get('afastado', 0) == 1)
+        total_pagantes = total_obreiros - int(nao_pagantes.sum())
+        receita_mensal_potencial = df_relatorio_obreiros[~nao_pagantes]['valor_mensalidade'].sum()
         
-        col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
+        col_stat1, col_stat2, col_stat3, col_stat4, col_stat5 = st.columns(5)
         col_stat1.metric("Total de Obreiros", total_obreiros)
         col_stat2.metric("Obreiros Isentos", total_isentos)
-        col_stat3.metric("Obreiros Pagantes", total_pagantes)
-        col_stat4.metric("Receita Mensal Potencial", formatar_moeda(receita_mensal_potencial))
+        col_stat3.metric("Obreiros Afastados", total_afastados)
+        col_stat4.metric("Obreiros Pagantes", total_pagantes)
+        col_stat5.metric("Receita Mensal Potencial", formatar_moeda(receita_mensal_potencial))
         
         # Distribuição por grau
         st.markdown("---")

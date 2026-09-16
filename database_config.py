@@ -97,10 +97,11 @@ def init_db():
             )
         """)
     
-    # Colunas do auto atendimento (senha do obreiro)
+    # Colunas do auto atendimento (senha do obreiro) e afastamento
     if DB_TYPE == 'postgresql':
         cursor.execute("ALTER TABLE obreiros ADD COLUMN IF NOT EXISTS senha TEXT")
         cursor.execute("ALTER TABLE obreiros ADD COLUMN IF NOT EXISTS senha_alterada INTEGER DEFAULT 0")
+        cursor.execute("ALTER TABLE obreiros ADD COLUMN IF NOT EXISTS afastado INTEGER DEFAULT 0")
         cursor.execute("UPDATE obreiros SET senha = %s WHERE senha IS NULL",
                        (hash_senha_obreiro(SENHA_INICIAL_OBREIRO),))
     else:
@@ -110,6 +111,10 @@ def init_db():
             pass
         try:
             cursor.execute("ALTER TABLE obreiros ADD COLUMN senha_alterada INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute("ALTER TABLE obreiros ADD COLUMN afastado INTEGER DEFAULT 0")
         except sqlite3.OperationalError:
             pass
         cursor.execute("UPDATE obreiros SET senha = ? WHERE senha IS NULL",
@@ -383,6 +388,28 @@ def init_db():
                 valor REAL NOT NULL,
                 data_solicitacao TEXT NOT NULL,
                 status TEXT DEFAULT 'Aguardando'
+            )
+        """)
+
+    # Isenções de mensalidade por mês específico (obreiro isento só em determinados meses)
+    if DB_TYPE == 'postgresql':
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS isencoes (
+                id SERIAL PRIMARY KEY,
+                obreiro_id INTEGER NOT NULL,
+                mes_competencia TEXT NOT NULL,
+                ano_competencia TEXT NOT NULL,
+                UNIQUE (obreiro_id, mes_competencia, ano_competencia)
+            )
+        """)
+    else:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS isencoes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                obreiro_id INTEGER NOT NULL,
+                mes_competencia TEXT NOT NULL,
+                ano_competencia TEXT NOT NULL,
+                UNIQUE (obreiro_id, mes_competencia, ano_competencia)
             )
         """)
 
