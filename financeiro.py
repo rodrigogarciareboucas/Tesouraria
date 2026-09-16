@@ -204,13 +204,42 @@ def verificar_login(email, senha):
 
 # Se não estiver logado nem em modo obreiro, mostrar tela de login
 if not st.session_state.get('usuario_logado') and not st.session_state.get('modo_obreiro'):
-    # CSS personalizado para login
-    st.markdown("""
-        <style>
+    # Fundo da tela de login: foto da loja desfocada
+    _bg_b64 = None
+    try:
+        import base64 as _b64
+        with open("portal/img/frenteloja.jpg", "rb") as _f:
+            _bg_b64 = _b64.b64encode(_f.read()).decode()
+    except Exception:
+        pass
+
+    if _bg_b64:
+        _bg_css = """
+        .stApp, [data-testid="stAppViewContainer"] { background: transparent !important; }
+        .stApp::before {
+            content: ""; position: fixed; inset: -25px;
+            background: url("data:image/jpeg;base64,__BG__") center/cover no-repeat;
+            filter: blur(8px);
+            z-index: -1;
+        }
+        .stApp::after {
+            content: ""; position: fixed; inset: 0;
+            background: rgba(15, 23, 42, 0.55);
+            z-index: -1;
+        }
+        """.replace("__BG__", _bg_b64)
+    else:
+        _bg_css = """
         .main {
             background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
             min-height: 100vh;
         }
+        """
+
+    # CSS personalizado para login
+    st.markdown("""
+        <style>
+        """ + _bg_css + """
         .login-container {
             background: rgba(255, 255, 255, 0.95);
             border-radius: 20px;
@@ -240,16 +269,44 @@ if not st.session_state.get('usuario_logado') and not st.session_state.get('modo
             max-width: 350px;
         }
         .title {
-            color: #1e3a5f;
             font-size: 2.5rem;
             font-weight: bold;
             text-align: center;
             margin-bottom: 10px;
         }
+        .title {
+            color: #d4af37 !important;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+        }
         .subtitle {
-            color: #64748b;
+            color: rgba(255, 255, 255, 0.92) !important;
             text-align: center;
             margin-bottom: 30px;
+            text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+        }
+        /* Cards de login em "vidro escuro" — legíveis sobre a foto em qualquer tema */
+        div[data-testid="stVerticalBlock"]:has(.login-card) {
+            background: rgba(15, 23, 42, 0.78) !important;
+            border: 1px solid rgba(212, 175, 55, 0.45) !important;
+            border-radius: 16px !important;
+            padding: 10px 20px !important;
+        }
+        div[data-testid="stVerticalBlock"]:has(.login-card) p,
+        div[data-testid="stVerticalBlock"]:has(.login-card) label,
+        div[data-testid="stVerticalBlock"]:has(.login-card) span,
+        div[data-testid="stVerticalBlock"]:has(.login-card) small {
+            color: #f1f5f9 !important;
+        }
+        div[data-testid="stVerticalBlock"]:has(.login-card) h3 {
+            color: #d4af37 !important;
+        }
+        div[data-testid="stFormSubmitButton"] button,
+        .stFormSubmitButton button {
+            background: linear-gradient(135deg, #d4af37 0%, #f4d03f 100%) !important;
+            color: #1e3a5f !important;
+            font-weight: bold !important;
+            border-radius: 10px !important;
+            border: none !important;
         }
         .watermark {
             position: fixed;
@@ -301,6 +358,7 @@ if not st.session_state.get('usuario_logado') and not st.session_state.get('modo
 
     with col_obreiro:
         with st.container(border=True):
+            st.markdown('<div class="login-card"></div>', unsafe_allow_html=True)
             st.markdown("### 💳 Área do Obreiro")
             st.caption("Consulte suas mensalidades, pague via PIX e baixe sua ficha.")
             with st.form("login_obreiro_page"):
@@ -311,6 +369,7 @@ if not st.session_state.get('usuario_logado') and not st.session_state.get('modo
 
     with col_tesoureiro:
         with st.container(border=True):
+            st.markdown('<div class="login-card"></div>', unsafe_allow_html=True)
             st.markdown("### 🏛️ Acesso do Tesoureiro")
             st.caption("Gestão financeira completa da loja.")
             with st.form("login_form"):
@@ -364,7 +423,7 @@ if not st.session_state.get('usuario_logado') and not st.session_state.get('modo
 
     st.markdown("---")
     st.markdown("""
-        <div style="text-align: center; color: #64748b; margin-top: 20px;">
+        <div style="text-align: center; color: rgba(255,255,255,0.8); margin-top: 20px; text-shadow: 0 1px 4px rgba(0,0,0,0.6);">
             <p>🔒 Sistema Seguro de Gestão Financeira Maçônica</p>
             <p style="font-size: 0.8rem;">© 2026 Rodrigo Garcia Rebouças</p>
         </div>
